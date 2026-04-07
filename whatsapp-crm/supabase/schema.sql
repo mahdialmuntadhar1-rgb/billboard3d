@@ -1,6 +1,21 @@
 -- Enable required extension for UUID generation
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
+-- Businesses table (must exist before messages references it)
+CREATE TABLE IF NOT EXISTS businesses (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  business_name VARCHAR(255) NOT NULL,
+  phone_1 VARCHAR(50), -- Primary phone number
+  phone_2 VARCHAR(50), -- Secondary phone number  
+  whatsapp VARCHAR(50), -- WhatsApp number
+  governorate VARCHAR(100), -- Governorate/Province
+  city VARCHAR(100), -- City
+  category VARCHAR(100), -- Business category
+  status VARCHAR(50) DEFAULT 'approved', -- approved, pending, suspended
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Campaigns table
 CREATE TABLE IF NOT EXISTS campaigns (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -108,6 +123,10 @@ CREATE TABLE IF NOT EXISTS template_stats (
 );
 
 -- Indexes for performance
+CREATE INDEX IF NOT EXISTS idx_businesses_status ON businesses(status);
+CREATE INDEX IF NOT EXISTS idx_businesses_governorate ON businesses(governorate);
+CREATE INDEX IF NOT EXISTS idx_businesses_category ON businesses(category);
+CREATE INDEX IF NOT EXISTS idx_businesses_city ON businesses(city);
 CREATE INDEX IF NOT EXISTS idx_messages_campaign_id ON messages(campaign_id);
 CREATE INDEX IF NOT EXISTS idx_messages_status ON messages(status);
 CREATE INDEX IF NOT EXISTS idx_messages_phone ON messages(phone);
@@ -118,6 +137,7 @@ CREATE INDEX IF NOT EXISTS idx_conversation_direction ON conversation_messages(d
 CREATE INDEX IF NOT EXISTS idx_campaign_templates_campaign_id ON campaign_templates(campaign_id);
 
 -- Enable RLS (Row Level Security) - adjust policies as needed
+ALTER TABLE businesses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE campaigns ENABLE ROW LEVEL SECURITY;
 ALTER TABLE message_templates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
@@ -127,6 +147,10 @@ ALTER TABLE campaign_templates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE template_stats ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for service role (backend access)
+DROP POLICY IF EXISTS "service_role_full_access_businesses" ON businesses;
+CREATE POLICY "service_role_full_access_businesses" ON businesses
+  FOR ALL USING (auth.jwt() ->> 'role' = 'service_role');
+
 DROP POLICY IF EXISTS "service_role_full_access_campaigns" ON campaigns;
 CREATE POLICY "service_role_full_access_campaigns" ON campaigns
   FOR ALL USING (auth.jwt() ->> 'role' = 'service_role');
@@ -165,6 +189,11 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Add updated_at triggers (safe with IF NOT EXISTS approach)
+DROP TRIGGER IF EXISTS update_businesses_updated_at ON businesses;
+CREATE TRIGGER update_businesses_updated_at
+  BEFORE UPDATE ON businesses
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 DROP TRIGGER IF EXISTS update_campaigns_updated_at ON campaigns;
 CREATE TRIGGER update_campaigns_updated_at
   BEFORE UPDATE ON campaigns

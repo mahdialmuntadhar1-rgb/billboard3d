@@ -19,6 +19,20 @@ export const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 });
 
 // Types for database tables
+export interface Business {
+  id: string;
+  business_name: string;
+  phone_1?: string;
+  phone_2?: string;
+  whatsapp?: string;
+  governorate?: string;
+  city?: string;
+  category?: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Campaign {
   id: string;
   name: string;

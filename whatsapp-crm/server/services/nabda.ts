@@ -53,14 +53,27 @@ interface NabdaSendResponse {
 export async function sendMessage(phone: string, text: string): Promise<NabdaSendResponse> {
   try {
     const normalizedPhone = normalizePhoneNumber(phone);
+    console.log(`[nabda/send] Preparing to send message:`, {
+      originalPhone: phone,
+      normalizedPhone: normalizedPhone,
+      messageLength: text.length,
+      messagePreview: text.substring(0, 100) + (text.length > 100 ? '...' : '')
+    });
+    
+    const requestBody = {
+      to: normalizedPhone,
+      body: text,
+      type: 'text',
+    };
+    
+    console.log(`[nabda/send] Making API call to: ${NABDA_API_URL}/messages/send`);
+    console.log(`[nabda/send] Request body:`, requestBody);
+    
+    const startTime = Date.now();
     
     const response = await axios.post(
       `${NABDA_API_URL}/messages/send`,
-      {
-        to: normalizedPhone,
-        body: text,
-        type: 'text',
-      },
+      requestBody,
       {
         headers: {
           'Authorization': `Bearer ${NABDA_API_KEY}`,
@@ -70,23 +83,53 @@ export async function sendMessage(phone: string, text: string): Promise<NabdaSen
       }
     );
     
+    const responseTime = Date.now() - startTime;
+    console.log(`[nabda/send] API response received in ${responseTime}ms:`, {
+      status: response.status,
+      statusText: response.statusText,
+      data: response.data
+    });
+    
     if (response.data && response.data.message_id) {
+      console.log(`[nabda/send] Message sent successfully, ID: ${response.data.message_id}`);
       return {
         success: true,
         messageId: response.data.message_id,
       };
     }
     
+    // Handle alternative response format
+    if (response.data?.id) {
+      console.log(`[nabda/send] Message sent successfully (alternative format), ID: ${response.data.id}`);
+      return {
+        success: true,
+        messageId: response.data.id,
+      };
+    }
+    
+    console.log(`[nabda/send] Unexpected response format:`, response.data);
     return {
       success: true,
-      messageId: response.data?.id,
+      messageId: response.data?.id || 'unknown',
     };
+    
   } catch (error: any) {
-    console.error('Nabda API error:', error.response?.data || error.message);
+    const errorDetails = {
+      message: error.message,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      code: error.code
+    };
+    
+    console.error(`[nabda/send] Nabda API error:`, errorDetails);
+    
+    const errorMessage = error.response?.data?.message || error.message || 'Failed to send message';
+    console.log(`[nabda/send] Returning error response:`, { success: false, error: errorMessage });
     
     return {
       success: false,
-      error: error.response?.data?.message || error.message || 'Failed to send message',
+      error: errorMessage,
     };
   }
 }

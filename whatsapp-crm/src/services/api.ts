@@ -2,6 +2,72 @@ import { Campaign, MessageTemplate, ConversationMessage, FAQAnswer } from '../ty
 
 const API_BASE = '/api';
 
+// Businesses API
+export const businessesApi = {
+  preview: async (filters: {
+    governorate?: string;
+    city?: string;
+    category?: string;
+    status?: string;
+  }): Promise<{ success: boolean; stats: any; filters: any }> => {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) params.set(key, value);
+    });
+    const res = await fetch(`${API_BASE}/businesses/preview?${params}`);
+    if (!res.ok) throw new Error('Failed to preview businesses');
+    return res.json();
+  },
+
+  previewSample: async (filters: {
+    governorate?: string;
+    city?: string;
+    category?: string;
+    status?: string;
+  }, limit: number = 10): Promise<{ success: boolean; businesses: any[]; total: number; sampleCount: number }> => {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) params.set(key, value);
+    });
+    params.set('limit', String(limit));
+    const res = await fetch(`${API_BASE}/businesses/preview/sample?${params}`);
+    if (!res.ok) throw new Error('Failed to preview sample businesses');
+    return res.json();
+  },
+
+  getFilters: async (): Promise<{ success: boolean; governorates: string[]; cities: string[]; categories: string[] }> => {
+    const res = await fetch(`${API_BASE}/businesses/filters`);
+    if (!res.ok) throw new Error('Failed to get filter options');
+    return res.json();
+  },
+
+  queue: async (campaignId: string, filters: {
+    governorate?: string;
+    city?: string;
+    category?: string;
+  }, testMode: boolean = false, testLimit: number = 10): Promise<{ 
+    success: boolean; 
+    businesses: any[]; 
+    total_matched: number; 
+    total_with_phones: number; 
+    test_mode: boolean; 
+    test_limit: number | null 
+  }> => {
+    const res = await fetch(`${API_BASE}/businesses/queue`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        campaign_id: campaignId,
+        filters,
+        test_mode: testMode,
+        test_limit: testLimit
+      }),
+    });
+    if (!res.ok) throw new Error('Failed to queue businesses');
+    return res.json();
+  },
+};
+
 // Campaigns API
 export const campaignsApi = {
   list: async (): Promise<{ campaigns: Campaign[] }> => {

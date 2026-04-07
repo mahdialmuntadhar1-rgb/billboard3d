@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Plus, Edit, Trash2, Play, Pause, BarChart3, Filter, Check, X } from 'lucide-react';
-import { campaignsApi, templatesApi } from '../services/api';
+import { Plus, Edit, Trash2, Play, Pause, BarChart3, Filter, Check, X, AlertTriangle, Users, Phone } from 'lucide-react';
+import { campaignsApi, templatesApi, businessesApi } from '../services/api';
 import { Campaign, MessageTemplate, Business } from '../types';
 
 const TEMPLATE_STRATEGIES = [
@@ -8,13 +8,6 @@ const TEMPLATE_STRATEGIES = [
   { value: 'random_template', label: 'Random Selection', description: 'Randomly pick from available templates' },
   { value: 'even_rotation', label: 'Even Rotation', description: 'Rotate through templates equally' },
   { value: 'weighted_ab_test', label: 'Weighted A/B Test', description: 'Test templates with custom weights' },
-];
-
-// Mock business data - replace with actual API
-const MOCK_BUSINESSES: Business[] = [
-  { id: '1', name: 'Al-Mansour Restaurant', phone: '+9647701234567', city: 'Baghdad', category: 'Restaurant' },
-  { id: '2', name: 'Tech Solutions Ltd', phone: '+9647707654321', city: 'Basra', category: 'Technology' },
-  { id: '3', name: 'Al-Rasheed Pharmacy', phone: '+9647709876543', city: 'Mosul', category: 'Healthcare' },
 ];
 
 export default function Campaigns() {
@@ -25,6 +18,19 @@ export default function Campaigns() {
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // New state for real business data
+  const [businessStats, setBusinessStats] = useState<any>(null);
+  const [sampleBusinesses, setSampleBusinesses] = useState<any[]>([]);
+  const [filterOptions, setFilterOptions] = useState<any>(null);
+  const [testMode, setTestMode] = useState(true);
+  const [testLimit, setTestLimit] = useState(10);
+  const [audienceFilters, setAudienceFilters] = useState({
+    governorate: '',
+    city: '',
+    category: '',
+    status: 'approved'
+  });
 
   // Form state
   const [formData, setFormData] = useState({
@@ -40,18 +46,51 @@ export default function Campaigns() {
 
   const loadData = async () => {
     try {
-      const [campaignsRes, templatesRes] = await Promise.all([
+      const [campaignsRes, templatesRes, filterRes] = await Promise.all([
         campaignsApi.list(),
         templatesApi.list({ is_active: true }),
+        businessesApi.getFilters()
       ]);
       setCampaigns(campaignsRes.campaigns);
       setTemplates(templatesRes.templates);
+      setFilterOptions(filterRes);
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
       setLoading(false);
     }
   };
+
+  const loadBusinessData = async () => {
+    try {
+      console.log('[Campaigns] Loading business data with filters:', audienceFilters);
+      
+      const [statsRes, sampleRes] = await Promise.all([
+        businessesApi.preview(audienceFilters),
+        businessesApi.previewSample(audienceFilters, 5)
+      ]);
+      
+      if (statsRes.success) {
+        setBusinessStats(statsRes.stats);
+      }
+      
+      if (sampleRes.success) {
+        setSampleBusinesses(sampleRes.businesses);
+      }
+      
+      console.log('[Campaigns] Business data loaded:', { stats: statsRes.stats, sampleCount: sampleRes.businesses.length });
+    } catch (error) {
+      console.error('Failed to load business data:', error);
+      setBusinessStats(null);
+      setSampleBusinesses([]);
+    }
+  };
+
+  useEffect(() => {
+    if (showQueueModal && selectedCampaign) {
+      loadBusinessData();
+    }
+  }, [showQueueModal, selectedCampaign, audienceFilters]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,22 +135,39 @@ export default function Campaigns() {
     
     setSaving(true);
     try {
-      // In production, fetch actual businesses based on audience_filters
-      await campaignsApi.create({
-        ...selectedCampaign,
-        template_ids: [],
-      });
-      
-      // Queue messages for the businesses
-      // For testing mode, pass empty array to trigger test message
-      await import('../services/api').then(({ messagesApi }) => 
-        messagesApi.queue(selectedCampaign.id, [])
+      console.log('[Campaigns] Queueing messages for campaign:', selectedCampaign.id);
+      console.log('[Campaigns] Test mode:', testMode, 'Test limit:', testLimit);
+      console.log('[Campaigns] Filters:', audienceFilters);
+
+      // Get businesses for queuing
+      const queueRes = await businessesApi.queue(
+        selectedCampaign.id,
+        audienceFilters,
+        testMode,
+        testLimit
       );
-      
+
+      if (!queueRes.success) {
+        throw new Error('Failed to prepare businesses for queuing');
+      }
+
+      console.log('[Campaigns] Businesses prepared:', queueRes);
+
+      // Queue messages using the prepared businesses
+      const messagesRes = await import('../services/api').then(({ messagesApi }) => 
+        messagesApi.queue(selectedCampaign.id, queueRes.businesses)
+      );
+
+      console.log('[Campaigns] Messages queued:', messagesRes);
+
       setShowQueueModal(false);
-      alert('Queued 1 test message');
+      
+      const modeText = testMode ? `Test Mode (${queueRes.total_with_phones} recipients)` : `${queueRes.total_with_phones} recipients`;
+      alert(`Successfully queued ${messagesRes.queued} messages in ${modeText}`);
+
     } catch (error) {
       console.error('Failed to queue messages:', error);
+      alert(`Failed to queue messages: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setSaving(false);
     }
@@ -167,7 +223,7 @@ export default function Campaigns() {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
         {campaigns.length === 0 ? (
           <div className="p-12 text-center">
-            <MessageSquare className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+            <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
             <p className="text-gray-500">No campaigns yet. Create your first campaign to get started.</p>
           </div>
         ) : (
@@ -325,32 +381,187 @@ export default function Campaigns() {
       {/* Queue Modal */}
       {showQueueModal && selectedCampaign && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-lg w-full">
+          <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-auto">
             <div className="p-6 border-b border-gray-200">
               <h2 className="text-xl font-semibold">Queue Messages</h2>
               <p className="text-gray-500 mt-1">{selectedCampaign.name}</p>
             </div>
             
-            <div className="p-6 space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="text-sm text-blue-700">
-                  This will queue messages for <strong>{MOCK_BUSINESSES.length} businesses</strong> based on your audience filters.
+            <div className="p-6 space-y-6">
+              {/* Test Mode Toggle */}
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      id="testMode"
+                      checked={testMode}
+                      onChange={(e) => setTestMode(e.target.checked)}
+                      className="w-4 h-4 text-yellow-600 border-gray-300 rounded focus:ring-yellow-500"
+                    />
+                    <label htmlFor="testMode" className="font-medium text-yellow-800">
+                      Test Mode
+                    </label>
+                  </div>
+                  {testMode && (
+                    <div className="flex items-center gap-2">
+                      <label htmlFor="testLimit" className="text-sm text-yellow-700">Limit:</label>
+                      <select
+                        id="testLimit"
+                        value={testLimit}
+                        onChange={(e) => setTestLimit(Number(e.target.value))}
+                        className="px-2 py-1 text-sm border border-yellow-300 rounded focus:ring-yellow-500 focus:border-yellow-500"
+                      >
+                        <option value={5}>5 recipients</option>
+                        <option value={10}>10 recipients</option>
+                        <option value={20}>20 recipients</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+                <p className="text-sm text-yellow-700">
+                  {testMode 
+                    ? `Only ${testLimit} recipients will be queued for testing. No full campaign sending.`
+                    : 'All matching recipients will be queued for full campaign sending.'
+                  }
                 </p>
               </div>
 
-              <div className="border border-gray-200 rounded-lg divide-y">
-                {MOCK_BUSINESSES.map(business => (
-                  <div key={business.id} className="p-3 flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-sm">{business.name}</p>
-                      <p className="text-xs text-gray-500">{business.phone} • {business.city}</p>
-                    </div>
-                    <Check className="w-4 h-4 text-green-500" />
+              {/* Audience Filters */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="font-medium text-gray-900 mb-3">Audience Filters</h3>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Governorate</label>
+                    <select
+                      value={audienceFilters.governorate}
+                      onChange={(e) => setAudienceFilters(prev => ({ ...prev, governorate: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-whatsapp-green focus:border-transparent"
+                    >
+                      <option value="">All Governorates</option>
+                      {filterOptions?.governorates.map((gov: string) => (
+                        <option key={gov} value={gov}>{gov}</option>
+                      ))}
+                    </select>
                   </div>
-                ))}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                    <select
+                      value={audienceFilters.city}
+                      onChange={(e) => setAudienceFilters(prev => ({ ...prev, city: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-whatsapp-green focus:border-transparent"
+                    >
+                      <option value="">All Cities</option>
+                      {filterOptions?.cities.map((city: string) => (
+                        <option key={city} value={city}>{city}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                    <select
+                      value={audienceFilters.category}
+                      onChange={(e) => setAudienceFilters(prev => ({ ...prev, category: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-whatsapp-green focus:border-transparent"
+                    >
+                      <option value="">All Categories</option>
+                      {filterOptions?.categories.map((cat: string) => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
               </div>
 
-              <div className="flex justify-end gap-3 pt-4">
+              {/* Business Stats */}
+              {businessStats ? (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h3 className="font-medium text-blue-900 mb-3">Audience Statistics</h3>
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <div className="text-2xl font-bold text-blue-600">{businessStats.total}</div>
+                      <div className="text-sm text-blue-700">Total Businesses</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-green-600">{businessStats.withValidPhones}</div>
+                      <div className="text-sm text-green-700">With Valid Phones</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-red-600">{businessStats.withoutValidPhones}</div>
+                      <div className="text-sm text-red-700">Without Valid Phones</div>
+                    </div>
+                  </div>
+                  {testMode && (
+                    <div className="mt-3 text-center text-sm text-blue-700">
+                      <strong>Test Mode:</strong> Will queue {Math.min(testLimit, businessStats.withValidPhones)} recipients
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-gray-100 border border-gray-200 rounded-lg p-4 text-center">
+                  <div className="animate-pulse">
+                    <div className="h-4 bg-gray-300 rounded w-1/4 mx-auto mb-2"></div>
+                    <div className="h-3 bg-gray-300 rounded w-1/6 mx-auto"></div>
+                  </div>
+                </div>
+              )}
+
+              {/* Sample Businesses Preview */}
+              {sampleBusinesses.length > 0 && (
+                <div>
+                  <h3 className="font-medium text-gray-900 mb-3">Sample Recipients (First 5)</h3>
+                  <div className="border border-gray-200 rounded-lg divide-y max-h-64 overflow-auto">
+                    {sampleBusinesses.map((business: any, index: number) => (
+                      <div key={index} className="p-3 flex items-center justify-between hover:bg-gray-50">
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">{business.business_name}</p>
+                          <p className="text-xs text-gray-500">
+                            {business.governorate} {business.city && `> ${business.city}`}
+                          </p>
+                          <p className="text-xs text-gray-400">{business.category}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs font-medium text-green-600">{business.selectedPhone}</p>
+                          <p className="text-xs text-gray-400">{business.selectedPhoneField}</p>
+                        </div>
+                        <Check className="w-4 h-4 text-green-500 ml-2" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Warning if no businesses found */}
+              {businessStats && businessStats.withValidPhones === 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <div className="flex items-center gap-3">
+                    <AlertTriangle className="w-5 h-5 text-red-600" />
+                    <div>
+                      <p className="font-medium text-red-800">No valid recipients found</p>
+                      <p className="text-sm text-red-700 mt-1">
+                        Try adjusting your filters or ensure businesses have valid phone numbers.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Supabase Environment Warning */}
+              {!process.env.SUPABASE_URL && (
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                  <div className="flex items-center gap-3">
+                    <AlertTriangle className="w-5 h-5 text-orange-600" />
+                    <div>
+                      <p className="font-medium text-orange-800">Missing Supabase Configuration</p>
+                      <p className="text-sm text-orange-700 mt-1">
+                        Please ensure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are configured.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
                 <button
                   onClick={() => setShowQueueModal(false)}
                   className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
@@ -359,10 +570,10 @@ export default function Campaigns() {
                 </button>
                 <button
                   onClick={handleQueueMessages}
-                  disabled={saving}
-                  className="px-4 py-2 bg-whatsapp-green text-white rounded-lg hover:bg-green-600 disabled:opacity-50"
+                  disabled={saving || !businessStats || businessStats.withValidPhones === 0}
+                  className="px-4 py-2 bg-whatsapp-green text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {saving ? 'Queueing...' : 'Queue Messages'}
+                  {saving ? 'Queueing...' : `Queue ${testMode ? `Test (${Math.min(testLimit, businessStats?.withValidPhones || 0)})` : 'All'} Messages`}
                 </button>
               </div>
             </div>

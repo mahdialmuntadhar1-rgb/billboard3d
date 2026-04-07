@@ -9,7 +9,11 @@
     "server": "tsx watch server/index.ts",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "seed:businesses": "tsx scripts/seed-businesses.ts",
+    "test:crm": "tsx scripts/test-crm.ts",
+    "test:e2e": "tsx scripts/test-e2e-pipeline.ts",
+    "monitor:pipeline": "tsx scripts/pipeline-monitor.ts"
   },
   "dependencies": {
     "react": "^18.2.0",

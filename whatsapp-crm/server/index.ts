@@ -6,6 +6,7 @@ import messageRoutes from './routes/messages';
 import templateRoutes from './routes/templates';
 import inboxRoutes from './routes/inbox';
 import webhookRoutes from './routes/webhook';
+import businessRoutes from './routes/businesses';
 
 dotenv.config();
 
@@ -27,6 +28,7 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/templates', templateRoutes);
 app.use('/api/inbox', inboxRoutes);
 app.use('/api/webhook', webhookRoutes);
+app.use('/api/businesses', businessRoutes);
 
 // Error handling
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {

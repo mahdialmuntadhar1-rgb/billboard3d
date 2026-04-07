@@ -35,6 +35,12 @@ router.post('/queue', async (req, res) => {
   try {
     const { campaign_id, businesses } = req.body;
     
+    console.log('[messages/queue] Queue request:', { campaign_id, businessCount: businesses?.length });
+    
+    if (!businesses || businesses.length === 0) {
+      return res.status(400).json({ error: 'No businesses provided for queuing' });
+    }
+    
     // Get campaign with templates
     const { data: campaign, error: campaignError } = await supabase
       .from('campaigns')
@@ -58,59 +64,34 @@ router.post('/queue', async (req, res) => {
     // Generate messages for each business
     const messagesToInsert = [];
     
-    // Testing mode: if no businesses provided, create test message
-    if (!businesses || businesses.length === 0) {
+    for (const business of businesses) {
       // Select template based on strategy
       const template = selectTemplate(templates, campaign.template_strategy, campaign_id);
-      if (template) {
-        // Render message with test data
-        const context = {
-          business_name: 'Test Business',
-          city: 'Baghdad',
-          category: 'Technology',
-        };
-        const renderedMessage = renderTemplate(template, context);
-        
-        messagesToInsert.push({
-          campaign_id,
-          template_id: template.id,
-          business_id: null,
-          business_name: 'Test Business',
-          category: 'Technology',
-          city: 'Baghdad',
-          phone: '9647701995386',
-          rendered_message: renderedMessage,
-          status: 'pending',
-        });
-      }
-    } else {
-      // Normal mode: process provided businesses
-      for (const business of businesses) {
-        // Select template based on strategy
-        const template = selectTemplate(templates, campaign.template_strategy, campaign_id);
-        if (!template) continue;
-        
-        // Render message
-        const context = {
-          business_name: business.name,
-          city: business.city,
-          category: business.category,
-        };
-        const renderedMessage = renderTemplate(template, context);
-        
-        messagesToInsert.push({
-          campaign_id,
-          template_id: template.id,
-          business_id: business.id,
-          business_name: business.name,
-          category: business.category,
-          city: business.city,
-          phone: business.phone,
-          rendered_message: renderedMessage,
-          status: 'pending',
-        });
-      }
+      if (!template) continue;
+      
+      // Render message
+      const context = {
+        business_name: business.name,
+        city: business.city,
+        category: business.category,
+        governorate: business.governorate,
+      };
+      const renderedMessage = renderTemplate(template, context);
+      
+      messagesToInsert.push({
+        campaign_id,
+        template_id: template.id,
+        business_id: business.id,
+        business_name: business.name,
+        category: business.category,
+        city: business.city,
+        phone: business.phone, // Use the pre-selected phone
+        rendered_message: renderedMessage,
+        status: 'pending',
+      });
     }
+    
+    console.log(`[messages/queue] Generated ${messagesToInsert.length} messages for queuing`);
     
     // Insert messages
     const { data: messages, error: insertError } = await supabase
@@ -130,7 +111,9 @@ router.post('/queue', async (req, res) => {
       queued: messages?.length || 0,
       messages 
     });
+    
   } catch (error: any) {
+    console.error('[messages/queue] Error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -139,6 +122,8 @@ router.post('/queue', async (req, res) => {
 router.post('/send', async (req, res) => {
   try {
     const { limit = 10, campaign_id } = req.body;
+    
+    console.log(`[messages/send] Starting send process - limit: ${limit}, campaign: ${campaign_id || 'all'}`);
     
     // Fetch pending messages
     let query = supabase
@@ -154,62 +139,152 @@ router.post('/send', async (req, res) => {
     
     const { data: messages, error } = await query;
     
-    if (error) throw error;
-    if (!messages || messages.length === 0) {
-      return res.json({ sent: 0, results: [] });
+    if (error) {
+      console.error('[messages/send] Database error fetching pending messages:', error);
+      throw error;
     }
+    
+    if (!messages || messages.length === 0) {
+      console.log('[messages/send] No pending messages found');
+      return res.json({ sent: 0, failed: 0, results: [] });
+    }
+    
+    console.log(`[messages/send] Found ${messages.length} pending messages to process`);
+    
+    // Log message details before sending
+    messages.forEach((message, index) => {
+      console.log(`[messages/send] Message ${index + 1}/${messages.length}:`, {
+        id: message.id,
+        business_name: message.business_name,
+        phone: message.phone,
+        campaign_id: message.campaign_id,
+        template_id: message.template_id,
+        message_preview: message.rendered_message.substring(0, 50) + '...'
+      });
+    });
     
     // Send messages with rate limiting
     const results = [];
+    let processedCount = 0;
+    
     for (const message of messages) {
+      processedCount++;
+      console.log(`[messages/send] Processing message ${processedCount}/${messages.length} (${message.id})`);
+      
+      // Validate phone number
       if (!isValidPhoneNumber(message.phone)) {
-        await supabase
+        console.log(`[messages/send] Invalid phone number for ${message.business_name}: ${message.phone}`);
+        
+        const { error: updateError } = await supabase
           .from('messages')
-          .update({ status: 'failed', error_message: 'Invalid phone number' })
+          .update({ 
+            status: 'failed', 
+            error_message: 'Invalid phone number',
+            updated_at: new Date().toISOString()
+          })
           .eq('id', message.id);
+        
+        if (updateError) {
+          console.error(`[messages/send] Failed to update failed status for message ${message.id}:`, updateError);
+        } else {
+          console.log(`[messages/send] Updated message ${message.id} to failed status (invalid phone)`);
+        }
         
         results.push({ id: message.id, success: false, error: 'Invalid phone number' });
         continue;
       }
       
+      console.log(`[messages/send] Phone validation passed for ${message.business_name}: ${message.phone}`);
+      
       // Send via Nabda
+      console.log(`[messages/send] Sending message to ${message.business_name} via Nabda...`);
+      const startTime = Date.now();
+      
       const sendResult = await sendMessage(message.phone, message.rendered_message);
       
+      const sendDuration = Date.now() - startTime;
+      console.log(`[messages/send] Nabda API call completed in ${sendDuration}ms for ${message.business_name}:`, {
+        success: sendResult.success,
+        messageId: sendResult.messageId,
+        error: sendResult.error
+      });
+      
       if (sendResult.success) {
-        await supabase
+        console.log(`[messages/send] Message sent successfully to ${message.business_name}, Nabda ID: ${sendResult.messageId}`);
+        
+        const { error: updateError } = await supabase
           .from('messages')
           .update({ 
             status: 'sent', 
             sent_at: new Date().toISOString(),
-            nabda_message_id: sendResult.messageId 
+            nabda_message_id: sendResult.messageId,
+            updated_at: new Date().toISOString()
           })
           .eq('id', message.id);
         
+        if (updateError) {
+          console.error(`[messages/send] Failed to update sent status for message ${message.id}:`, updateError);
+        } else {
+          console.log(`[messages/send] Updated message ${message.id} to sent status`);
+        }
+        
         results.push({ id: message.id, success: true, messageId: sendResult.messageId });
       } else {
-        await supabase
+        console.log(`[messages/send] Message send failed for ${message.business_name}: ${sendResult.error}`);
+        
+        const { error: updateError } = await supabase
           .from('messages')
           .update({ 
             status: 'failed', 
-            error_message: sendResult.error 
+            error_message: sendResult.error,
+            updated_at: new Date().toISOString()
           })
           .eq('id', message.id);
+        
+        if (updateError) {
+          console.error(`[messages/send] Failed to update failed status for message ${message.id}:`, updateError);
+        } else {
+          console.log(`[messages/send] Updated message ${message.id} to failed status`);
+        }
         
         results.push({ id: message.id, success: false, error: sendResult.error });
       }
       
       // Rate limit: 1 message per 4 seconds (~15/minute)
-      if (messages.indexOf(message) < messages.length - 1) {
+      if (processedCount < messages.length) {
+        console.log(`[messages/send] Rate limiting: waiting 4000ms before next message...`);
         await new Promise(resolve => setTimeout(resolve, 4000));
       }
     }
     
+    const sentCount = results.filter(r => r.success).length;
+    const failedCount = results.filter(r => !r.success).length;
+    
+    console.log(`[messages/send] Send process completed:`, {
+      total: messages.length,
+      sent: sentCount,
+      failed: failedCount,
+      campaign_id: campaign_id || 'all'
+    });
+    
+    // Log final results summary
+    results.forEach((result, index) => {
+      console.log(`[messages/send] Result ${index + 1}:`, {
+        messageId: result.id,
+        success: result.success,
+        nabdaMessageId: result.messageId,
+        error: result.error
+      });
+    });
+    
     res.json({ 
-      sent: results.filter(r => r.success).length,
-      failed: results.filter(r => !r.success).length,
+      sent: sentCount,
+      failed: failedCount,
       results 
     });
+    
   } catch (error: any) {
+    console.error('[messages/send] Critical error in send process:', error);
     res.status(500).json({ error: error.message });
   }
 });
