@@ -1,4 +1,4 @@
-import { Campaign, MessageTemplate, ConversationMessage, FAQAnswer } from '../types';
+import { Campaign, MessageTemplate, ConversationMessage } from '../types';
 
 const API_BASE = '/api';
 

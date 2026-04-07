@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { Search, Send, Check, Sparkles, MessageCircle, Phone } from 'lucide-react';
+import { Search, Send, Check, Sparkles, MessageCircle } from 'lucide-react';
 import { inboxApi } from '../services/api';
 import { Conversation, ConversationMessage } from '../types';
 
@@ -196,7 +196,7 @@ export default function Inbox() {
 
               {/* Messages */}
               <div className="flex-1 overflow-auto chat-scrollbar p-4 space-y-4">
-                {messages.map((msg, i) => (
+                {messages.map((msg) => (
                   <div
                     key={msg.id}
                     className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}

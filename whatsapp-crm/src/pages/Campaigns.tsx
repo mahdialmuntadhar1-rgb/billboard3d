@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Plus, Edit, Trash2, Play, Pause, BarChart3, Filter, Check, X, AlertTriangle, Users, Phone } from 'lucide-react';
+import { Plus, Trash2, Play, BarChart3, AlertTriangle, Check } from 'lucide-react';
 import { campaignsApi, templatesApi, businessesApi } from '../services/api';
-import { Campaign, MessageTemplate, Business } from '../types';
+import { Campaign, MessageTemplate } from '../types';
 
 const TEMPLATE_STRATEGIES = [
   { value: 'single_template', label: 'Single Template', description: 'Use one template for all messages' },

@@ -1,6 +1,5 @@
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, MessageSquare, Send, FileText } from 'lucide-react';
-import InboxIcon from 'lucide-react/dist/esm/icons/inbox';
+import { LayoutDashboard, MessageSquare, Send, FileText, Inbox } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Campaigns from './pages/Campaigns';
 import MessageQueue from './pages/MessageQueue';
@@ -14,7 +13,7 @@ function App() {
     { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/campaigns', icon: MessageSquare, label: 'Campaigns' },
     { path: '/queue', icon: Send, label: 'Queue' },
-    { path: '/inbox', icon: InboxIcon, label: 'Inbox' },
+    { path: '/inbox', icon: Inbox, label: 'Inbox' },
     { path: '/templates', icon: FileText, label: 'Templates' },
   ];
 

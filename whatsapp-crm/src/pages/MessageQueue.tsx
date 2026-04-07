@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Play, Pause, RotateCw, CheckCircle, XCircle, Clock, Send, AlertCircle } from 'lucide-react';
+import { Play, RotateCw, CheckCircle, XCircle, Clock, Send, AlertCircle } from 'lucide-react';
 import { messagesApi, campaignsApi } from '../services/api';
 import { Campaign } from '../types';
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Edit, Trash2, ToggleLeft, ToggleRight, AlertCircle, Check, X, Eye } from 'lucide-react';
+import { Plus, Edit, Trash2, ToggleLeft, ToggleRight, AlertCircle, X, Eye, FileText } from 'lucide-react';
 import { templatesApi } from '../services/api';
 import { MessageTemplate } from '../types';
 import { renderTemplate } from '../services/templateEngine';
@@ -71,9 +71,9 @@ export default function Templates() {
     setSaving(true);
     try {
       if (editingTemplate) {
-        await templatesApi.update(editingTemplate.id, formData);
+        await templatesApi.update(editingTemplate.id, formData as Partial<MessageTemplate>);
       } else {
-        await templatesApi.create(formData);
+        await templatesApi.create(formData as Omit<MessageTemplate, 'id' | 'created_at' | 'updated_at'>);
       }
       
       setShowModal(false);
@@ -109,14 +109,15 @@ export default function Templates() {
 
   const openEditModal = (template: MessageTemplate) => {
     setEditingTemplate(template);
-    setFormData({
+    const formData = {
       name: template.name,
       body: template.body,
-      cta_type: template.cta_type,
+      cta_type: template.cta_type as 'none' | 'link' | 'reply' | 'call',
       cta_value: template.cta_value || '',
       weight: template.weight,
-      is_active: template.is_active,
-    });
+      is_active: template.is_active
+    };
+    setFormData(formData);
     setShowModal(true);
   };
 
