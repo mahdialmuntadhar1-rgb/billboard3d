@@ -312,35 +312,169 @@ export default function Campaigns() {
         )}
       </div>
 
-      {/* Create Modal */}
+      {/* Create Modal - ENHANCED WITH TEST MODE */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-auto">
             <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold">Create Campaign</h2>
+              <h2 className="text-xl font-semibold">إنشاء حملة جديدة / Create Campaign</h2>
             </div>
             
             <form onSubmit={handleCreate} className="p-6 space-y-6">
+              {/* TEST MODE SECTION - PROMINENT */}
+              <div className="border-2 border-yellow-400 rounded-lg p-4 bg-yellow-50">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="px-3 py-1 bg-yellow-500 text-white text-xs font-bold rounded-full">TESTING</span>
+                  <h3 className="font-bold text-yellow-900">وضع الاختبار / Test Mode</h3>
+                </div>
+                
+                {/* Test Mode Toggle */}
+                <div className="flex items-center justify-between mb-4 p-3 bg-white rounded-lg border border-yellow-300">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-12 h-7 rounded-full transition-colors cursor-pointer ${testMode ? 'bg-yellow-500' : 'bg-gray-300'}`}
+                         onClick={() => setTestMode(!testMode)}>
+                      <div className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform mt-0.5 ${testMode ? 'translate-x-6' : 'translate-x-0.5'}`} />
+                    </div>
+                    <div>
+                      <label className={`font-bold ${testMode ? 'text-yellow-800' : 'text-gray-700'}`}>
+                        {testMode ? '✓ وضع الاختبار مفعل / TEST MODE ON' : 'تفعيل وضع الاختبار / Enable Test Mode'}
+                      </label>
+                      <p className="text-xs text-gray-500">اختر هنا قبل الإرسال / Select before sending</p>
+                    </div>
+                  </div>
+                </div>
+
+                {testMode && (
+                  <>
+                    {/* Recipient Type Selection */}
+                    <div className="mb-4 p-3 bg-white rounded-lg border border-yellow-300">
+                      <label className="block text-sm font-bold text-yellow-900 mb-3">
+                        إرسال الاختبار إلى / Send Test To:
+                      </label>
+                      <div className="space-y-3">
+                        <label className="flex items-center gap-3 cursor-pointer p-2 rounded hover:bg-yellow-100">
+                          <input
+                            type="radio"
+                            name="testRecipient"
+                            checked={testRecipientType === 'database'}
+                            onChange={() => setTestRecipientType('database')}
+                            className="w-5 h-5 text-yellow-600"
+                          />
+                          <div>
+                            <span className="text-sm font-medium text-gray-900">قاعدة البيانات (محدود) / Database (Limited)</span>
+                            <p className="text-xs text-gray-500">إرسال لعدد محدد من الأعمال / Send to limited businesses</p>
+                          </div>
+                        </label>
+                        <label className="flex items-center gap-3 cursor-pointer p-2 rounded hover:bg-yellow-100">
+                          <input
+                            type="radio"
+                            name="testRecipient"
+                            checked={testRecipientType === 'manual'}
+                            onChange={() => setTestRecipientType('manual')}
+                            className="w-5 h-5 text-yellow-600"
+                          />
+                          <div>
+                            <span className="text-sm font-medium text-gray-900">رقم هاتفي فقط / My Phone Only</span>
+                            <p className="text-xs text-gray-500">إرسال لهاتفي فقط، لا أحد غيري / Send to my phone only</p>
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Manual Phone Input */}
+                    {testRecipientType === 'manual' && (
+                      <div className="mt-3 p-4 bg-yellow-100 rounded-lg border-2 border-yellow-400">
+                        <label className="block text-sm font-bold text-yellow-900 mb-2">
+                          أدخل رقم هاتفك للاختبار / Enter Your Test Phone:
+                        </label>
+                        <input
+                          type="tel"
+                          value={testPhoneNumber}
+                          onChange={(e) => setTestPhoneNumber(e.target.value)}
+                          placeholder="07XXXXXXXX أو +964XXXXXXXXX"
+                          className="w-full px-4 py-3 border-2 border-yellow-500 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent font-mono text-lg"
+                        />
+                        <p className="text-xs text-yellow-800 mt-2">
+                          يقبل: 07XXXXXXXX أو +964XXXXXXXXX / Accepts: 07XXXXXXXX or +964XXXXXXXXX
+                        </p>
+                        <div className="mt-3 p-2 bg-red-100 border border-red-300 rounded">
+                          <p className="text-sm font-bold text-red-700">
+                            ⚠️ سيتم الإرسال لهذا الرقم فقط - لا أحد غيرك سيتلقى الرسالة
+                          </p>
+                          <p className="text-xs text-red-600">
+                            Only this number will receive messages - NO database contacts will be messaged
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Database Recipient Count */}
+                    {testRecipientType === 'database' && (
+                      <div className="mt-3 p-4 bg-white rounded-lg border border-yellow-300">
+                        <label className="block text-sm font-bold text-yellow-900 mb-2">
+                          عدد المستلمين / Recipient Count:
+                        </label>
+                        <div className="flex gap-3">
+                          {[1, 3, 5, 10].map(num => (
+                            <button
+                              key={num}
+                              type="button"
+                              onClick={() => setTestLimit(num)}
+                              className={`px-4 py-2 rounded-lg font-bold ${
+                                testLimit === num 
+                                  ? 'bg-yellow-500 text-white' 
+                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                              }`}
+                            >
+                              {num}
+                            </button>
+                          ))}
+                        </div>
+                        <p className="text-xs text-yellow-700 mt-2">
+                          سيتم إرسال {testLimit} رسائل فقط / Only {testLimit} messages will be sent
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Message Type */}
+                    <div className="mt-4 p-3 bg-white rounded-lg border border-yellow-300">
+                      <label className="block text-sm font-bold text-yellow-900 mb-2">
+                        نوع الرسالة / Message Type:
+                      </label>
+                      <select
+                        value={testMessageType}
+                        onChange={(e) => setTestMessageType(e.target.value as any)}
+                        className="w-full px-3 py-2 border border-yellow-300 rounded-lg focus:ring-2 focus:ring-yellow-500"
+                      >
+                        <option value="informative">معلوماتية / Informative</option>
+                        <option value="question">سؤال وإجابة / Question & Reply</option>
+                        <option value="cta">دعوة للتصرف / Call-to-Action</option>
+                      </select>
+                    </div>
+                  </>
+                )}
+              </div>
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Campaign Name</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">اسم الحملة / Campaign Name</label>
                 <input
                   type="text"
                   required
                   value={formData.name}
                   onChange={e => setFormData({ ...formData, name: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-whatsapp-green focus:border-transparent"
-                  placeholder="e.g., Spring Promotion 2024"
+                  placeholder="مثال: حملة ربيع 2024"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">الوصف / Description</label>
                 <textarea
                   value={formData.description}
                   onChange={e => setFormData({ ...formData, description: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-whatsapp-green focus:border-transparent"
                   rows={3}
-                  placeholder="Describe the purpose of this campaign..."
+                  placeholder="وصف الحملة..."
                 />
               </div>
 

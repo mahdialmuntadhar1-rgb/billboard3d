@@ -81,6 +81,11 @@ export interface Message {
   delivered_at?: string;
   read_at?: string;
   nabda_message_id?: string;
+  // Traceability fields for testing workflow
+  is_internal_test?: boolean;
+  recipient_source?: 'filtered_audience' | 'internal_test' | 'manual_test';
+  message_mode?: 'informative' | 'claim_business' | 'profile_preview' | 'reply_question';
+  landing_page_variant?: 'business_profile' | 'claim_page' | 'app_intro';
   metadata: Record<string, any>;
   created_at: string;
   updated_at: string;
