@@ -13,7 +13,10 @@
     "seed:businesses": "tsx scripts/seed-businesses.ts",
     "test:crm": "tsx scripts/test-crm.ts",
     "test:e2e": "tsx scripts/test-e2e-pipeline.ts",
-    "monitor:pipeline": "tsx scripts/pipeline-monitor.ts"
+    "monitor:pipeline": "tsx scripts/pipeline-monitor.ts",
+    "audit:pipeline": "tsx scripts/audit-messaging-pipeline.ts",
+    "audit:deployed": "tsx scripts/audit-deployed-pipeline.ts",
+    "fix:deployed": "tsx scripts/fix-deployed-pipeline.ts"
   },
   "dependencies": {
     "react": "^18.2.0",

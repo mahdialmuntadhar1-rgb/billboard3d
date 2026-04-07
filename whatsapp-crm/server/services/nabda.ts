@@ -166,10 +166,41 @@ export async function getMessageStatus(messageId: string): Promise<{
 }
 
 /**
- * Validate phone number format
+ * Validate phone number format - matches business service validation
  */
 export function isValidPhoneNumber(phone: string): boolean {
-  const normalized = normalizePhoneNumber(phone);
-  // Basic validation: +964 followed by 10 digits
-  return /^\+964\d{10}$/.test(normalized);
+  if (!phone || typeof phone !== 'string') return false;
+  
+  // Remove common formatting characters
+  const cleanPhone = phone.replace(/[\s\-\(\)]/g, '').trim();
+  
+  // Skip obviously invalid numbers
+  if (cleanPhone.length < 10) return false;
+  if (cleanPhone === '1234567890' || cleanPhone === '0000000000') return false;
+  
+  // Iraqi phone patterns - more lenient
+  const iraqiPatterns = [
+    /^\+9647\d{8,9}$/,  // +9647xxxxxxxx
+    /^07\d{9}$/,        // 07xxxxxxxxx
+    /^\+96478\d{7,8}$/, // +96478xxxxxxx
+    /^\+96479\d{7,8}$/, // +96479xxxxxxx
+    /^\+96475\d{7,8}$/, // +96475xxxxxxx
+    /^078\d{8}$/,       // 078xxxxxxxx
+    /^079\d{8}$/,       // 079xxxxxxxx
+    /^075\d{8}$/        // 075xxxxxxxx
+  ];
+  
+  // General international pattern
+  const generalPattern = /^\+\d{10,15}$/;
+  
+  // Check if it matches any valid pattern
+  const isValid = iraqiPatterns.some(pattern => pattern.test(cleanPhone)) || 
+                  generalPattern.test(cleanPhone);
+  
+  // Log validation attempts for debugging
+  if (!isValid && cleanPhone.length >= 10) {
+    console.log(`[nabda] Phone validation failed: ${phone} -> ${cleanPhone}`);
+  }
+  
+  return isValid;
 }

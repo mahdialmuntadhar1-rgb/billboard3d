@@ -18,17 +18,42 @@ export function selectBestPhone(business: Business): { phone: string; field: str
   return null;
 }
 
-// Basic phone validation - can be enhanced later
+// Basic phone validation - more lenient for real-world data
 function isValidPhone(phone: string): boolean {
-  // Remove common formatting characters
-  const cleanPhone = phone.replace(/[\s\-\(\)]/g, '');
+  if (!phone || typeof phone !== 'string') return false;
   
-  // Check for minimum length and basic pattern
-  // Iraqi phone numbers typically start with +9647 or 07
-  const iraqiPattern = /^(\+9647|07)\d{8,9}$/;
+  // Remove common formatting characters
+  const cleanPhone = phone.replace(/[\s\-\(\)]/g, '').trim();
+  
+  // Skip obviously invalid numbers
+  if (cleanPhone.length < 10) return false;
+  if (cleanPhone === '1234567890' || cleanPhone === '0000000000') return false;
+  
+  // Iraqi phone patterns - more lenient
+  const iraqiPatterns = [
+    /^\+9647\d{8,9}$/,  // +9647xxxxxxxx
+    /^07\d{9}$/,        // 07xxxxxxxxx
+    /^\+96478\d{7,8}$/, // +96478xxxxxxx
+    /^\+96479\d{7,8}$/, // +96479xxxxxxx
+    /^\+96475\d{7,8}$/, // +96475xxxxxxx
+    /^078\d{8}$/,       // 078xxxxxxxx
+    /^079\d{8}$/,       // 079xxxxxxxx
+    /^075\d{8}$/        // 075xxxxxxxx
+  ];
+  
+  // General international pattern
   const generalPattern = /^\+\d{10,15}$/;
   
-  return iraqiPattern.test(cleanPhone) || generalPattern.test(cleanPhone);
+  // Check if it matches any valid pattern
+  const isValid = iraqiPatterns.some(pattern => pattern.test(cleanPhone)) || 
+                  generalPattern.test(cleanPhone);
+  
+  // Log validation attempts for debugging
+  if (!isValid && cleanPhone.length >= 10) {
+    console.log(`[businesses] Phone validation failed: ${phone} -> ${cleanPhone}`);
+  }
+  
+  return isValid;
 }
 
 // Fetch businesses with filters
