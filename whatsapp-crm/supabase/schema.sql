@@ -121,6 +121,35 @@ ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE conversation_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE faq_answers ENABLE ROW LEVEL SECURITY;
 
+-- RLS Policies for service role (backend access)
+DROP POLICY IF EXISTS "service_role_full_access_campaigns" ON campaigns;
+CREATE POLICY "service_role_full_access_campaigns" ON campaigns
+  FOR ALL USING (auth.jwt() ->> 'role' = 'service_role');
+
+DROP POLICY IF EXISTS "service_role_full_access_message_templates" ON message_templates;
+CREATE POLICY "service_role_full_access_message_templates" ON message_templates
+  FOR ALL USING (auth.jwt() ->> 'role' = 'service_role');
+
+DROP POLICY IF EXISTS "service_role_full_access_messages" ON messages;
+CREATE POLICY "service_role_full_access_messages" ON messages
+  FOR ALL USING (auth.jwt() ->> 'role' = 'service_role');
+
+DROP POLICY IF EXISTS "service_role_full_access_conversation_messages" ON conversation_messages;
+CREATE POLICY "service_role_full_access_conversation_messages" ON conversation_messages
+  FOR ALL USING (auth.jwt() ->> 'role' = 'service_role');
+
+DROP POLICY IF EXISTS "service_role_full_access_faq_answers" ON faq_answers;
+CREATE POLICY "service_role_full_access_faq_answers" ON faq_answers
+  FOR ALL USING (auth.jwt() ->> 'role' = 'service_role');
+
+DROP POLICY IF EXISTS "service_role_full_access_campaign_templates" ON campaign_templates;
+CREATE POLICY "service_role_full_access_campaign_templates" ON campaign_templates
+  FOR ALL USING (auth.jwt() ->> 'role' = 'service_role');
+
+DROP POLICY IF EXISTS "service_role_full_access_template_stats" ON template_stats;
+CREATE POLICY "service_role_full_access_template_stats" ON template_stats
+  FOR ALL USING (auth.jwt() ->> 'role' = 'service_role');
+
 -- Create updated_at trigger function
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
