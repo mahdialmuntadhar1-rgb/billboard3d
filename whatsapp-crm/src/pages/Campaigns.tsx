@@ -25,6 +25,9 @@ export default function Campaigns() {
   const [filterOptions, setFilterOptions] = useState<any>(null);
   const [testMode, setTestMode] = useState(true);
   const [testLimit, setTestLimit] = useState(10);
+  const [testPhoneNumber, setTestPhoneNumber] = useState('');
+  const [testRecipientType, setTestRecipientType] = useState<'database' | 'manual'>('database');
+  const [testMessageType, setTestMessageType] = useState<'informative' | 'question' | 'cta'>('informative');
   const [audienceFilters, setAudienceFilters] = useState({
     governorate: '',
     city: '',
@@ -137,32 +140,70 @@ export default function Campaigns() {
     try {
       console.log('[Campaigns] Queueing messages for campaign:', selectedCampaign.id);
       console.log('[Campaigns] Test mode:', testMode, 'Test limit:', testLimit);
+      console.log('[Campaigns] Test recipient type:', testRecipientType);
+      console.log('[Campaigns] Test phone:', testPhoneNumber);
       console.log('[Campaigns] Filters:', audienceFilters);
 
-      // Get businesses for queuing
-      const queueRes = await businessesApi.queue(
-        selectedCampaign.id,
-        audienceFilters,
-        testMode,
-        testLimit
-      );
-
-      if (!queueRes.success) {
-        throw new Error('Failed to prepare businesses for queuing');
+      // Validate manual test phone if in manual mode
+      if (testMode && testRecipientType === 'manual') {
+        if (!testPhoneNumber || testPhoneNumber.length < 10) {
+          alert('Please enter a valid test phone number');
+          setSaving(false);
+          return;
+        }
       }
 
-      console.log('[Campaigns] Businesses prepared:', queueRes);
+      let queueRes;
 
-      // Queue messages using the prepared businesses
+      if (testMode && testRecipientType === 'manual' && testPhoneNumber) {
+        // Manual test recipient - override database audience completely
+        console.log('[Campaigns] Using manual test recipient:', testPhoneNumber);
+        queueRes = {
+          success: true,
+          businesses: [{
+            id: 'test-recipient',
+            business_name: 'Test Recipient (Manual)',
+            selectedPhone: testPhoneNumber.startsWith('+964') ? testPhoneNumber : '+964' + testPhoneNumber.replace(/^0/, ''),
+            selectedPhoneField: 'manual_test',
+            governorate: 'Test',
+            city: 'Test',
+            category: 'Test'
+          }],
+          total_with_phones: 1,
+          testMode: true,
+          manualRecipient: true
+        };
+      } else {
+        // Database audience (test mode with limit or full production)
+        queueRes = await businessesApi.queue(
+          selectedCampaign.id,
+          audienceFilters,
+          testMode,
+          testLimit
+        );
+      }
+
+      if (!queueRes.success) {
+        throw new Error('Failed to prepare recipients for queuing');
+      }
+
+      console.log('[Campaigns] Recipients prepared:', queueRes);
+
+      // Queue messages using the prepared recipients
       const messagesRes = await import('../services/api').then(({ messagesApi }) => 
-        messagesApi.queue(selectedCampaign.id, queueRes.businesses)
+        messagesApi.queue(selectedCampaign.id, queueRes.businesses, testMessageType)
       );
 
       console.log('[Campaigns] Messages queued:', messagesRes);
 
       setShowQueueModal(false);
       
-      const modeText = testMode ? `Test Mode (${queueRes.total_with_phones} recipients)` : `${queueRes.total_with_phones} recipients`;
+      const modeText = testMode 
+        ? (testRecipientType === 'manual' 
+            ? `Manual Test to ${testPhoneNumber}` 
+            : `Test Mode (${queueRes.total_with_phones} recipients)`)
+        : `${queueRes.total_with_phones} recipients`;
+      
       alert(`Successfully queued ${messagesRes.queued} messages in ${modeText}`);
 
     } catch (error) {
@@ -388,43 +429,150 @@ export default function Campaigns() {
             </div>
             
             <div className="p-6 space-y-6">
-              {/* Test Mode Toggle */}
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-3">
+              {/* Test Mode Section */}
+              <div className={`border rounded-lg p-4 ${testMode ? 'bg-yellow-50 border-yellow-300' : 'bg-gray-50 border-gray-200'}`}>
+                {/* Test Mode Toggle */}
+                <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      id="testMode"
-                      checked={testMode}
-                      onChange={(e) => setTestMode(e.target.checked)}
-                      className="w-4 h-4 text-yellow-600 border-gray-300 rounded focus:ring-yellow-500"
-                    />
-                    <label htmlFor="testMode" className="font-medium text-yellow-800">
-                      Test Mode
+                    <div className={`w-10 h-6 rounded-full transition-colors cursor-pointer ${testMode ? 'bg-yellow-500' : 'bg-gray-300'}`}
+                         onClick={() => setTestMode(!testMode)}>
+                      <div className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform mt-0.5 ${testMode ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                    </div>
+                    <label className={`font-semibold ${testMode ? 'text-yellow-800' : 'text-gray-700'}`}>
+                      {testMode ? ' TEST MODE ACTIVE' : 'Test Mode (Safe Testing)'}
                     </label>
                   </div>
-                  {testMode && (
-                    <div className="flex items-center gap-2">
-                      <label htmlFor="testLimit" className="text-sm text-yellow-700">Limit:</label>
-                      <select
-                        id="testLimit"
-                        value={testLimit}
-                        onChange={(e) => setTestLimit(Number(e.target.value))}
-                        className="px-2 py-1 text-sm border border-yellow-300 rounded focus:ring-yellow-500 focus:border-yellow-500"
-                      >
-                        <option value={5}>5 recipients</option>
-                        <option value={10}>10 recipients</option>
-                        <option value={20}>20 recipients</option>
-                      </select>
-                    </div>
-                  )}
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${testMode ? 'bg-yellow-200 text-yellow-800' : 'bg-gray-200 text-gray-600'}`}>
+                    {testMode ? 'TESTING' : 'PRODUCTION'}
+                  </span>
                 </div>
-                <p className="text-sm text-yellow-700">
-                  {testMode 
-                    ? `Only ${testLimit} recipients will be queued for testing. No full campaign sending.`
-                    : 'All matching recipients will be queued for full campaign sending.'
-                  }
-                </p>
+
+                {testMode && (
+                  <>
+                    {/* Test Recipient Selection */}
+                    <div className="mb-4 p-3 bg-white rounded-lg border border-yellow-200">
+                      <label className="block text-sm font-semibold text-yellow-800 mb-2">
+                        Send Test To:
+                      </label>
+                      <div className="flex gap-4 mb-3">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="testRecipient"
+                            checked={testRecipientType === 'database'}
+                            onChange={() => setTestRecipientType('database')}
+                            className="w-4 h-4 text-yellow-600"
+                          />
+                          <span className="text-sm text-gray-700">Filtered Database Audience</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="testRecipient"
+                            checked={testRecipientType === 'manual'}
+                            onChange={() => setTestRecipientType('manual')}
+                            className="w-4 h-4 text-yellow-600"
+                          />
+                          <span className="text-sm text-gray-700">My Phone Number (Manual)</span>
+                        </label>
+                      </div>
+
+                      {/* Manual Test Phone Input */}
+                      {testRecipientType === 'manual' && (
+                        <div className="mt-3 p-3 bg-yellow-100 rounded-lg border border-yellow-300">
+                          <label className="block text-sm font-bold text-yellow-900 mb-2">
+                            Enter Your Test Phone Number:
+                          </label>
+                          <input
+                            type="tel"
+                            value={testPhoneNumber}
+                            onChange={(e) => setTestPhoneNumber(e.target.value)}
+                            placeholder="e.g., 07701234567 or +9647701234567"
+                            className="w-full px-3 py-2 border-2 border-yellow-400 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent font-mono"
+                          />
+                          <p className="text-xs text-yellow-800 mt-1">
+                            Format: 07XXXXXXXX or +9647XXXXXXXX. Will be normalized to +964 format.
+                          </p>
+                          <p className="text-xs font-bold text-red-600 mt-2">
+                            When manual test is selected, NO messages will be sent to database audience.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Database Test Limit */}
+                      {testRecipientType === 'database' && (
+                        <div className="mt-3 flex items-center gap-3">
+                          <label className="text-sm text-gray-700">Test Limit:</label>
+                          <select
+                            value={testLimit}
+                            onChange={(e) => setTestLimit(Number(e.target.value))}
+                            className="px-3 py-1 border border-yellow-300 rounded focus:ring-yellow-500"
+                          >
+                            <option value={1}>1 recipient</option>
+                            <option value={3}>3 recipients</option>
+                            <option value={5}>5 recipients</option>
+                            <option value={10}>10 recipients</option>
+                          </select>
+                          <span className="text-xs text-yellow-700">
+                            (Limited from full database audience)
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Message Type Selector */}
+                    <div className="mb-4 p-3 bg-white rounded-lg border border-yellow-200">
+                      <label className="block text-sm font-semibold text-yellow-800 mb-2">
+                        Test Message Type:
+                      </label>
+                      <select
+                        value={testMessageType}
+                        onChange={(e) => setTestMessageType(e.target.value as any)}
+                        className="w-full px-3 py-2 border border-yellow-300 rounded-lg focus:ring-2 focus:ring-yellow-500"
+                      >
+                        <option value="informative">Simple Informative Text</option>
+                        <option value="question">Question/Reply Text</option>
+                        <option value="cta">CTA/Link Text</option>
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {testMessageType === 'informative' && 'Basic informational message without interaction'}
+                        {testMessageType === 'question' && 'Message with a question expecting reply'}
+                        {testMessageType === 'cta' && 'Message with call-to-action button/link'}
+                      </p>
+                    </div>
+
+                    {/* Test Mode Warning */}
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
+                        <div>
+                          <p className="font-bold text-red-800 text-sm">
+                            TEST MODE SAFETY GUARANTEE
+                          </p>
+                          <p className="text-sm text-red-700 mt-1">
+                            {testRecipientType === 'manual' 
+                              ? `ONLY your test number (${testPhoneNumber || 'not entered'}) will receive messages. ZERO database contacts will be messaged.`
+                              : `Only ${testLimit} test recipients from filtered database will be messaged. NOT the full audience.`}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {!testMode && (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <Check className="w-5 h-5 text-blue-600 mt-0.5" />
+                      <div>
+                        <p className="font-bold text-blue-800 text-sm">PRODUCTION MODE</p>
+                        <p className="text-sm text-blue-700 mt-1">
+                          Campaign will send to ALL matching database recipients based on filters below.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Audience Filters */}
@@ -570,10 +718,20 @@ export default function Campaigns() {
                 </button>
                 <button
                   onClick={handleQueueMessages}
-                  disabled={saving || !businessStats || businessStats.withValidPhones === 0}
-                  className="px-4 py-2 bg-whatsapp-green text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={saving || (testMode && testRecipientType === 'database' && (!businessStats || businessStats.withValidPhones === 0)) || (testMode && testRecipientType === 'manual' && !testPhoneNumber)}
+                  className={`px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed font-semibold ${
+                    testMode 
+                      ? 'bg-yellow-500 text-yellow-900 hover:bg-yellow-600' 
+                      : 'bg-whatsapp-green text-white hover:bg-green-600'
+                  }`}
                 >
-                  {saving ? 'Queueing...' : `Queue ${testMode ? `Test (${Math.min(testLimit, businessStats?.withValidPhones || 0)})` : 'All'} Messages`}
+                  {saving ? 'Queueing...' : (
+                    testMode 
+                      ? (testRecipientType === 'manual' 
+                          ? `Send Test to ${testPhoneNumber || '...'}` 
+                          : `Send Test to ${Math.min(testLimit, businessStats?.withValidPhones || 0)} Recipients`)
+                      : `Send to All ${businessStats?.withValidPhones || 0} Recipients`
+                  )}
                 </button>
               </div>
             </div>

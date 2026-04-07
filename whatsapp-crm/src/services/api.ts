@@ -184,11 +184,15 @@ export const messagesApi = {
     return res.json();
   },
 
-  queue: async (campaignId: string, businesses: any[]): Promise<{ queued: number; messages: any[] }> => {
+  queue: async (campaignId: string, businesses: any[], testMessageType?: string): Promise<{ queued: number; messages: any[] }> => {
     const res = await fetch(`${API_BASE}/messages/queue`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ campaign_id: campaignId, businesses }),
+      body: JSON.stringify({ 
+        campaign_id: campaignId, 
+        businesses,
+        test_message_type: testMessageType 
+      }),
     });
     if (!res.ok) throw new Error('Failed to queue messages');
     return res.json();
