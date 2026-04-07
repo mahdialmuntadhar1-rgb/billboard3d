@@ -1,0 +1,61 @@
+{
+  "version": 2,
+  "name": "iraq-compass-supabase",
+  "builds": [
+    {
+      "src": "api/**/*.ts",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/health",
+      "dest": "/api/routes.ts",
+      "methods": ["GET", "OPTIONS"]
+    },
+    {
+      "src": "/api/agents/list",
+      "dest": "/api/routes.ts",
+      "methods": ["GET", "OPTIONS"]
+    },
+    {
+      "src": "/api/agents/([^/]+)",
+      "dest": "/api/routes.ts",
+      "methods": ["GET", "OPTIONS"]
+    },
+    {
+      "src": "/api/jobs/([^/]+)/status",
+      "dest": "/api/routes.ts",
+      "methods": ["GET", "OPTIONS"]
+    },
+    {
+      "src": "/api/records/review-queue",
+      "dest": "/api/routes.ts",
+      "methods": ["GET", "OPTIONS"]
+    },
+    {
+      "src": "/api/records/approve",
+      "dest": "/api/routes.ts",
+      "methods": ["POST", "OPTIONS"]
+    },
+    {
+      "src": "/api/export",
+      "dest": "/api/routes.ts",
+      "methods": ["GET", "OPTIONS"]
+    },
+    {
+      "src": "/api/agent-runner",
+      "dest": "/api/agent-runner.ts",
+      "methods": ["GET", "POST", "OPTIONS"]
+    }
+  ],
+  "env": {
+    "SUPABASE_URL": "@supabase-url",
+    "SUPABASE_SERVICE_ROLE_KEY": "@supabase-service-key"
+  },
+  "functions": {
+    "api/agent-runner.ts": {
+      "maxDuration": 300
+    }
+  }
+}

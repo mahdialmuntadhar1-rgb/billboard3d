@@ -1,0 +1,27 @@
+name = "iraq-compass-agents"
+main = "src/index.ts"
+compatibility_date = "2024-12-18"
+compatibility_flags = ["nodejs_compat"]
+
+# Durable Objects configuration
+[[durable_objects.bindings]]
+name = "AGENT_DO"
+class_name = "GovernorateAgent"
+
+# Migrations for Durable Objects
+[[migrations]]
+tag = "v1"
+new_classes = ["GovernorateAgent"]
+
+# Environment variables (set via wrangler secret or dashboard)
+[vars]
+SUPABASE_URL = ""
+
+# Secrets (use `wrangler secret put` for these)
+# SUPABASE_SERVICE_ROLE_KEY
+# GOOGLE_MAPS_API_KEY
+
+# KV Namespace for caching (optional)
+# [[kv_namespaces]]
+# binding = "CACHE"
+# id = "your-kv-namespace-id"

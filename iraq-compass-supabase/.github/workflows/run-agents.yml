@@ -1,0 +1,55 @@
+name: Run Iraq Compass Agents
+
+on:
+  schedule:
+    # Run every 6 hours
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+    # Allow manual trigger from GitHub UI
+
+jobs:
+  run-agents:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # 18 Iraqi governorates
+        governorate:
+          - Baghdad
+          - Basra
+          - Nineveh
+          - Kirkuk
+          - Erbil
+          - Sulaymaniyah
+          - Dohuk
+          - Anbar
+          - Babil
+          - Karbala
+          - Najaf
+          - Wasit
+          - Saladin
+          - Diyala
+          - Muthanna
+          - Qadisiyyah
+          - Dhi Qar
+          - Maysan
+        # Top business categories
+        category:
+          - Restaurants
+          - Hotels
+          - Pharmacies
+          - Hospitals
+          - Schools
+    steps:
+      - name: Run Agent
+        run: |
+          echo "Running agent for ${{ matrix.governorate }} - ${{ matrix.category }}"
+          curl -X GET "https://your-app.vercel.app/api/agent-runner?governorate=${{ matrix.governorate }}&category=${{ matrix.category }}&sources=google_maps,web_scrape" \
+            -H "Content-Type: application/json" \
+            --max-time 300
+        env:
+          # Optional: Add retry logic
+          CURL_RETRY: 3
+
+      - name: Wait Between Agents
+        run: sleep 900  # 15 minutes to avoid overwhelming Supabase
+        if: matrix.governorate != 'Maysan' || matrix.category != 'Schools'

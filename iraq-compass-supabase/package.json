@@ -1,0 +1,20 @@
+{
+  "name": "iraq-compass-supabase",
+  "version": "1.0.0",
+  "description": "Iraq Compass Agent System - Supabase + Vercel Functions (No Cloudflare)",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel deploy",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.47.0",
+    "libphonenumber-js": "^1.11.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@vercel/node": "^3.0.0",
+    "typescript": "^5.3.0",
+    "vercel": "^33.0.0"
+  }
+}
