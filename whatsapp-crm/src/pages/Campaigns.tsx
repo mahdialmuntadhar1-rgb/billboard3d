@@ -103,13 +103,13 @@ export default function Campaigns() {
       });
       
       // Queue messages for the businesses
-      // This is a mock - in production you'd fetch actual filtered businesses
+      // For testing mode, pass empty array to trigger test message
       await import('../services/api').then(({ messagesApi }) => 
-        messagesApi.queue(selectedCampaign.id, MOCK_BUSINESSES)
+        messagesApi.queue(selectedCampaign.id, [])
       );
       
       setShowQueueModal(false);
-      alert(`Queued ${MOCK_BUSINESSES.length} messages`);
+      alert('Queued 1 test message');
     } catch (error) {
       console.error('Failed to queue messages:', error);
     } finally {

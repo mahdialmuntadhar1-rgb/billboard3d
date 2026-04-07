@@ -57,30 +57,59 @@ router.post('/queue', async (req, res) => {
     
     // Generate messages for each business
     const messagesToInsert = [];
-    for (const business of businesses) {
+    
+    // Testing mode: if no businesses provided, create test message
+    if (!businesses || businesses.length === 0) {
       // Select template based on strategy
       const template = selectTemplate(templates, campaign.template_strategy, campaign_id);
-      if (!template) continue;
-      
-      // Render message
-      const context = {
-        business_name: business.name,
-        city: business.city,
-        category: business.category,
-      };
-      const renderedMessage = renderTemplate(template, context);
-      
-      messagesToInsert.push({
-        campaign_id,
-        template_id: template.id,
-        business_id: business.id,
-        business_name: business.name,
-        category: business.category,
-        city: business.city,
-        phone: business.phone,
-        rendered_message: renderedMessage,
-        status: 'pending',
-      });
+      if (template) {
+        // Render message with test data
+        const context = {
+          business_name: 'Test Business',
+          city: 'Baghdad',
+          category: 'Technology',
+        };
+        const renderedMessage = renderTemplate(template, context);
+        
+        messagesToInsert.push({
+          campaign_id,
+          template_id: template.id,
+          business_id: null,
+          business_name: 'Test Business',
+          category: 'Technology',
+          city: 'Baghdad',
+          phone: '9647701995386',
+          rendered_message: renderedMessage,
+          status: 'pending',
+        });
+      }
+    } else {
+      // Normal mode: process provided businesses
+      for (const business of businesses) {
+        // Select template based on strategy
+        const template = selectTemplate(templates, campaign.template_strategy, campaign_id);
+        if (!template) continue;
+        
+        // Render message
+        const context = {
+          business_name: business.name,
+          city: business.city,
+          category: business.category,
+        };
+        const renderedMessage = renderTemplate(template, context);
+        
+        messagesToInsert.push({
+          campaign_id,
+          template_id: template.id,
+          business_id: business.id,
+          business_name: business.name,
+          category: business.category,
+          city: business.city,
+          phone: business.phone,
+          rendered_message: renderedMessage,
+          status: 'pending',
+        });
+      }
     }
     
     // Insert messages
