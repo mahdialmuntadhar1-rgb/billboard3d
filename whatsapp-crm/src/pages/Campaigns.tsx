@@ -28,6 +28,7 @@ export default function Campaigns() {
   const [testPhoneNumber, setTestPhoneNumber] = useState('');
   const [testRecipientType, setTestRecipientType] = useState<'database' | 'manual'>('database');
   const [testMessageType, setTestMessageType] = useState<'informative' | 'question' | 'cta'>('informative');
+  const [landingPageVariant, setLandingPageVariant] = useState<'business_profile' | 'claim_page' | 'app_intro'>('app_intro');
   const [audienceFilters, setAudienceFilters] = useState({
     governorate: '',
     city: '',
@@ -191,7 +192,7 @@ export default function Campaigns() {
 
       // Queue messages using the prepared recipients
       const messagesRes = await import('../services/api').then(({ messagesApi }) => 
-        messagesApi.queue(selectedCampaign.id, queueRes.businesses, testMessageType)
+        messagesApi.queue(selectedCampaign.id, queueRes.businesses, testMessageType, landingPageVariant, testLimit)
       );
 
       console.log('[Campaigns] Messages queued:', messagesRes);
@@ -553,141 +554,230 @@ export default function Campaigns() {
         </div>
       )}
 
-      {/* Queue Modal */}
+      {/* Queue Modal - ARABIC-FIRST REDESIGN */}
       {showQueueModal && selectedCampaign && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-auto">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold">Queue Messages</h2>
-              <p className="text-gray-500 mt-1">{selectedCampaign.name}</p>
+            <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-yellow-50 to-white">
+              <h2 className="text-2xl font-bold text-gray-900">إرسال رسائل الحملة / Send Campaign Messages</h2>
+              <p className="text-gray-600 mt-1">{selectedCampaign.name}</p>
             </div>
             
             <div className="p-6 space-y-6">
-              {/* Test Mode Section */}
-              <div className={`border rounded-lg p-4 ${testMode ? 'bg-yellow-50 border-yellow-300' : 'bg-gray-50 border-gray-200'}`}>
+              {/* Test Mode Section - ARABIC-FIRST */}
+              <div className={`border-2 rounded-lg p-5 ${testMode ? 'bg-yellow-50 border-yellow-400' : 'bg-gray-50 border-gray-300'}`}>
+                {/* Header with Badge */}
+                <div className="flex items-center gap-3 mb-4">
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${testMode ? 'bg-yellow-500 text-white' : 'bg-gray-400 text-white'}`}>
+                    {testMode ? 'وضع الاختبار مفعل' : 'وضع الاختبار معطل'}
+                  </span>
+                  <h3 className="font-bold text-lg text-gray-900">إعدادات الاختبار / Test Settings</h3>
+                </div>
+                
                 {/* Test Mode Toggle */}
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-6 rounded-full transition-colors cursor-pointer ${testMode ? 'bg-yellow-500' : 'bg-gray-300'}`}
+                <div className="flex items-center justify-between mb-5 p-4 bg-white rounded-lg border border-yellow-300 shadow-sm">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-14 h-8 rounded-full transition-colors cursor-pointer relative ${testMode ? 'bg-yellow-500' : 'bg-gray-300'}`}
                          onClick={() => setTestMode(!testMode)}>
-                      <div className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform mt-0.5 ${testMode ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                      <div className={`w-7 h-7 bg-white rounded-full shadow-lg absolute top-0.5 transition-all ${testMode ? 'left-6' : 'left-0.5'}`} />
                     </div>
-                    <label className={`font-semibold ${testMode ? 'text-yellow-800' : 'text-gray-700'}`}>
-                      {testMode ? ' TEST MODE ACTIVE' : 'Test Mode (Safe Testing)'}
-                    </label>
+                    <div>
+                      <label className={`font-bold text-lg ${testMode ? 'text-yellow-800' : 'text-gray-700'}`}>
+                        {testMode ? '✓ TEST MODE ON / وضع الاختبار مفعل' : 'Enable Test Mode / تفعيل وضع الاختبار'}
+                      </label>
+                      <p className="text-sm text-gray-500">
+                        {testMode ? 'آمن للاختبار - Safe for testing' : 'اختر للإرسال الحقيقي - Select for real sending'}
+                      </p>
+                    </div>
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${testMode ? 'bg-yellow-200 text-yellow-800' : 'bg-gray-200 text-gray-600'}`}>
-                    {testMode ? 'TESTING' : 'PRODUCTION'}
+                  <span className={`px-4 py-2 rounded-full text-sm font-bold ${testMode ? 'bg-yellow-200 text-yellow-900' : 'bg-gray-200 text-gray-700'}`}>
+                    {testMode ? 'TESTING / اختبار' : 'PRODUCTION / إنتاج'}
                   </span>
                 </div>
 
                 {testMode && (
                   <>
-                    {/* Test Recipient Selection */}
-                    <div className="mb-4 p-3 bg-white rounded-lg border border-yellow-200">
-                      <label className="block text-sm font-semibold text-yellow-800 mb-2">
-                        Send Test To:
+                    {/* Recipient Type Selection - ARABIC-FIRST */}
+                    <div className="mb-5 p-4 bg-white rounded-lg border-2 border-yellow-300 shadow-sm">
+                      <label className="block text-base font-bold text-gray-900 mb-3">
+                        إرسال الاختبار إلى / Send Test To:
                       </label>
-                      <div className="flex gap-4 mb-3">
-                        <label className="flex items-center gap-2 cursor-pointer">
+                      <div className="grid grid-cols-2 gap-4">
+                        <label className={`flex items-center gap-3 cursor-pointer p-4 rounded-lg border-2 transition-all ${testRecipientType === 'database' ? 'border-yellow-500 bg-yellow-50' : 'border-gray-200 hover:border-yellow-300'}`}>
                           <input
                             type="radio"
                             name="testRecipient"
                             checked={testRecipientType === 'database'}
                             onChange={() => setTestRecipientType('database')}
-                            className="w-4 h-4 text-yellow-600"
+                            className="w-5 h-5 text-yellow-600"
                           />
-                          <span className="text-sm text-gray-700">Filtered Database Audience</span>
+                          <div>
+                            <span className="text-base font-bold text-gray-900 block">قاعدة البيانات (محدود)</span>
+                            <span className="text-sm text-gray-600">Database (Limited)</span>
+                            <p className="text-xs text-gray-500 mt-1">إرسال لعدد محدد من الأعمال</p>
+                          </div>
                         </label>
-                        <label className="flex items-center gap-2 cursor-pointer">
+                        <label className={`flex items-center gap-3 cursor-pointer p-4 rounded-lg border-2 transition-all ${testRecipientType === 'manual' ? 'border-yellow-500 bg-yellow-50' : 'border-gray-200 hover:border-yellow-300'}`}>
                           <input
                             type="radio"
                             name="testRecipient"
                             checked={testRecipientType === 'manual'}
                             onChange={() => setTestRecipientType('manual')}
-                            className="w-4 h-4 text-yellow-600"
+                            className="w-5 h-5 text-yellow-600"
                           />
-                          <span className="text-sm text-gray-700">My Phone Number (Manual)</span>
+                          <div>
+                            <span className="text-base font-bold text-gray-900 block">رقم هاتفي فقط</span>
+                            <span className="text-sm text-gray-600">My Phone Only</span>
+                            <p className="text-xs text-green-600 mt-1 font-medium">✓ الأكثر أماناً / Safest</p>
+                          </div>
                         </label>
                       </div>
 
-                      {/* Manual Test Phone Input */}
+                      {/* Manual Test Phone Input - ARABIC-FIRST */}
                       {testRecipientType === 'manual' && (
-                        <div className="mt-3 p-3 bg-yellow-100 rounded-lg border border-yellow-300">
-                          <label className="block text-sm font-bold text-yellow-900 mb-2">
-                            Enter Your Test Phone Number:
+                        <div className="mt-4 p-5 bg-yellow-100 rounded-lg border-2 border-yellow-500 shadow-inner">
+                          <label className="block text-base font-bold text-yellow-900 mb-3">
+                            أدخل رقم هاتفك للاختبار / Enter Your Test Phone:
                           </label>
                           <input
                             type="tel"
                             value={testPhoneNumber}
                             onChange={(e) => setTestPhoneNumber(e.target.value)}
-                            placeholder="e.g., 07701234567 or +9647701234567"
-                            className="w-full px-3 py-2 border-2 border-yellow-400 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent font-mono"
+                            placeholder="07XXXXXXXX أو +964XXXXXXXXX"
+                            className="w-full px-4 py-4 text-lg border-2 border-yellow-500 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent font-mono bg-white"
                           />
-                          <p className="text-xs text-yellow-800 mt-1">
-                            Format: 07XXXXXXXX or +9647XXXXXXXX. Will be normalized to +964 format.
+                          <p className="text-sm text-yellow-800 mt-2">
+                            يقبل: 07XXXXXXXX أو +964XXXXXXXXX / Accepts both formats
                           </p>
-                          <p className="text-xs font-bold text-red-600 mt-2">
-                            When manual test is selected, NO messages will be sent to database audience.
-                          </p>
+                          <div className="mt-4 p-3 bg-red-100 border-2 border-red-400 rounded-lg">
+                            <p className="text-base font-bold text-red-800 text-center">
+                              ⚠️ سيتم الإرسال لهذا الرقم فقط
+                            </p>
+                            <p className="text-sm text-red-700 text-center">
+                              Only this number will receive messages - ZERO database contacts
+                            </p>
+                          </div>
                         </div>
                       )}
 
-                      {/* Database Test Limit */}
+                      {/* Database Recipient Count - ARABIC-FIRST */}
                       {testRecipientType === 'database' && (
-                        <div className="mt-3 flex items-center gap-3">
-                          <label className="text-sm text-gray-700">Test Limit:</label>
-                          <select
-                            value={testLimit}
-                            onChange={(e) => setTestLimit(Number(e.target.value))}
-                            className="px-3 py-1 border border-yellow-300 rounded focus:ring-yellow-500"
-                          >
-                            <option value={1}>1 recipient</option>
-                            <option value={3}>3 recipients</option>
-                            <option value={5}>5 recipients</option>
-                            <option value={10}>10 recipients</option>
-                          </select>
-                          <span className="text-xs text-yellow-700">
-                            (Limited from full database audience)
-                          </span>
+                        <div className="mt-4 p-5 bg-white rounded-lg border-2 border-yellow-300">
+                          <label className="block text-base font-bold text-gray-900 mb-3">
+                            عدد المستلمين / Recipient Count:
+                          </label>
+                          <div className="flex gap-3 flex-wrap">
+                            {[1, 3, 5, 10].map(num => (
+                              <button
+                                key={num}
+                                type="button"
+                                onClick={() => setTestLimit(num)}
+                                className={`px-6 py-3 rounded-lg font-bold text-lg transition-all ${
+                                  testLimit === num 
+                                    ? 'bg-yellow-500 text-white shadow-md' 
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                }`}
+                              >
+                                {num}
+                              </button>
+                            ))}
+                          </div>
+                          <p className="text-sm text-yellow-700 mt-3">
+                            سيتم إرسال <strong>{testLimit}</strong> رسائل فقط + رقم الاختبار الداخلي / 
+                            Only <strong>{testLimit}</strong> messages + internal test number
+                          </p>
                         </div>
                       )}
                     </div>
 
-                    {/* Message Type Selector */}
-                    <div className="mb-4 p-3 bg-white rounded-lg border border-yellow-200">
-                      <label className="block text-sm font-semibold text-yellow-800 mb-2">
-                        Test Message Type:
-                      </label>
-                      <select
-                        value={testMessageType}
-                        onChange={(e) => setTestMessageType(e.target.value as any)}
-                        className="w-full px-3 py-2 border border-yellow-300 rounded-lg focus:ring-2 focus:ring-yellow-500"
-                      >
-                        <option value="informative">Simple Informative Text</option>
-                        <option value="question">Question/Reply Text</option>
-                        <option value="cta">CTA/Link Text</option>
-                      </select>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {testMessageType === 'informative' && 'Basic informational message without interaction'}
-                        {testMessageType === 'question' && 'Message with a question expecting reply'}
-                        {testMessageType === 'cta' && 'Message with call-to-action button/link'}
-                      </p>
+                    {/* Message Type & Landing Page - SIDE BY SIDE */}
+                    <div className="grid grid-cols-2 gap-4 mb-5">
+                      {/* Message Type Selector - ARABIC-FIRST */}
+                      <div className="p-4 bg-white rounded-lg border-2 border-yellow-300">
+                        <label className="block text-base font-bold text-gray-900 mb-3">
+                          نوع الرسالة / Message Type:
+                        </label>
+                        <select
+                          value={testMessageType}
+                          onChange={(e) => setTestMessageType(e.target.value as any)}
+                          className="w-full px-3 py-3 border border-yellow-300 rounded-lg focus:ring-2 focus:ring-yellow-500 text-base"
+                        >
+                          <option value="informative">معلوماتية / Informative</option>
+                          <option value="claim_business">استلام الصفحة / Claim Business</option>
+                          <option value="profile_preview">معاينة الصفحة / Profile Preview</option>
+                          <option value="reply_question">سؤال / Question</option>
+                        </select>
+                        <p className="text-xs text-gray-500 mt-2">
+                          {testMessageType === 'informative' && 'رسالة تعريفية بسيطة / Simple intro message'}
+                          {testMessageType === 'claim_business' && 'دعوة لاستلام إدارة الصفحة / Invite to claim listing'}
+                          {testMessageType === 'profile_preview' && 'عرض كيف تظهر الصفحة / Show how page appears'}
+                          {testMessageType === 'reply_question' && 'سؤال يتوقع إجابة / Question expecting reply'}
+                        </p>
+                      </div>
+
+                      {/* Landing Page Variant - NEW */}
+                      <div className="p-4 bg-white rounded-lg border-2 border-blue-300">
+                        <label className="block text-base font-bold text-gray-900 mb-3">
+                          صفحة الهبوط / Landing Page:
+                        </label>
+                        <select
+                          value={landingPageVariant}
+                          onChange={(e) => setLandingPageVariant(e.target.value as any)}
+                          className="w-full px-3 py-3 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-base"
+                        >
+                          <option value="app_intro">تعريف بالتطبيق / App Intro</option>
+                          <option value="business_profile">صفحة العمل / Business Profile</option>
+                          <option value="claim_page">صفحة الاستلام / Claim Page</option>
+                        </select>
+                        <p className="text-xs text-gray-500 mt-2">
+                          {landingPageVariant === 'app_intro' && 'صفحة تعريفية عامة / General intro page'}
+                          {landingPageVariant === 'business_profile' && 'صفحة العمل نفسها / The actual business page'}
+                          {landingPageVariant === 'claim_page' && 'صفحة تركز على الاستلام / Claim-focused page'}
+                        </p>
+                      </div>
                     </div>
 
-                    {/* Test Mode Warning */}
-                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                      <div className="flex items-start gap-2">
-                        <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
-                        <div>
-                          <p className="font-bold text-red-800 text-sm">
-                            TEST MODE SAFETY GUARANTEE
+                    {/* Test Mode Safety Summary - ARABIC-FIRST */}
+                    <div className="p-4 bg-red-50 border-2 border-red-300 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <AlertTriangle className="w-6 h-6 text-red-600 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <p className="font-bold text-red-800 text-base mb-2">
+                            ملخص الأمان / Safety Summary
                           </p>
-                          <p className="text-sm text-red-700 mt-1">
-                            {testRecipientType === 'manual' 
-                              ? `ONLY your test number (${testPhoneNumber || 'not entered'}) will receive messages. ZERO database contacts will be messaged.`
-                              : `Only ${testLimit} test recipients from filtered database will be messaged. NOT the full audience.`}
-                          </p>
+                          <div className="text-sm text-red-700 space-y-1">
+                            {testRecipientType === 'manual' ? (
+                              <>
+                                <p>✓ <strong>الوضع الأكثر أماناً</strong> - safest mode</p>
+                                <p>✓ سيتم الإرسال فقط إلى: <strong>{testPhoneNumber || '(لم يتم الإدخال)'}</strong></p>
+                                <p>✓ عدد المستلمين: <strong>1</strong> (هاتفك فقط)</p>
+                                <p>✓ لا يتم إرسال أي رسائل لقاعدة البيانات</p>
+                                <p>✓ Zero database contacts will be messaged</p>
+                              </>
+                            ) : (
+                              <>
+                                <p>✓ سيتم الإرسال إلى: <strong>{testLimit}</strong> عمل من قاعدة البيانات</p>
+                                <p>✓ بالإضافة إلى: رقم الاختبار الداخلي (إذا مُكن)</p>
+                                <p>✓ لن يتم الإرسال للجمهور الكامل</p>
+                                <p>✓ Limited to {testLimit} recipients, NOT full audience</p>
+                              </>
+                            )}
+                            <p className="mt-2 pt-2 border-t border-red-200">
+                              نوع الرسالة: <strong>
+                                {testMessageType === 'informative' && 'معلوماتية'}
+                                {testMessageType === 'claim_business' && 'استلام الصفحة'}
+                                {testMessageType === 'profile_preview' && 'معاينة الصفحة'}
+                                {testMessageType === 'reply_question' && 'سؤال'}
+                              </strong> / Message type: <strong>{testMessageType}</strong>
+                            </p>
+                            <p>
+                              صفحة الهبوط: <strong>
+                                {landingPageVariant === 'app_intro' && 'تعريف بالتطبيق'}
+                                {landingPageVariant === 'business_profile' && 'صفحة العمل'}
+                                {landingPageVariant === 'claim_page' && 'صفحة الاستلام'}
+                              </strong> / Landing: <strong>{landingPageVariant}</strong>
+                            </p>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -695,13 +785,16 @@ export default function Campaigns() {
                 )}
 
                 {!testMode && (
-                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <div className="flex items-start gap-2">
-                      <Check className="w-5 h-5 text-blue-600 mt-0.5" />
+                  <div className="p-4 bg-blue-50 border-2 border-blue-300 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <Check className="w-6 h-6 text-blue-600 mt-0.5" />
                       <div>
-                        <p className="font-bold text-blue-800 text-sm">PRODUCTION MODE</p>
-                        <p className="text-sm text-blue-700 mt-1">
-                          Campaign will send to ALL matching database recipients based on filters below.
+                        <p className="font-bold text-blue-800 text-lg">وضع الإنتاج / PRODUCTION MODE</p>
+                        <p className="text-base text-blue-700 mt-2">
+                          سيتم الإرسال لجميع المستلمين المطابقين للفلاتر في قاعدة البيانات
+                        </p>
+                        <p className="text-sm text-blue-600">
+                          Campaign will send to ALL matching database recipients
                         </p>
                       </div>
                     </div>

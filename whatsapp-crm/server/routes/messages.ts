@@ -33,9 +33,15 @@ router.get('/status', async (req, res) => {
 // POST /api/messages/queue - Queue messages for a campaign
 router.post('/queue', async (req, res) => {
   try {
-    const { campaign_id, businesses } = req.body;
+    const { campaign_id, businesses, test_message_type, landing_page_variant, recipient_count } = req.body;
     
-    console.log('[messages/queue] Queue request:', { campaign_id, businessCount: businesses?.length });
+    console.log('[messages/queue] Queue request:', { 
+      campaign_id, 
+      businessCount: businesses?.length,
+      test_message_type,
+      landing_page_variant,
+      recipient_count
+    });
     
     if (!businesses || businesses.length === 0) {
       return res.status(400).json({ error: 'No businesses provided for queuing' });
@@ -61,17 +67,49 @@ router.post('/queue', async (req, res) => {
       return res.status(400).json({ error: 'No templates linked to campaign' });
     }
     
+    // Get internal test phone from config
+    const internalTestPhone = process.env.INTERNAL_TEST_PHONE?.trim();
+    const includeInternalTest = internalTestPhone && internalTestPhone.length > 0;
+    
+    // Track phones for duplicate prevention
+    const queuedPhones = new Set<string>();
+    
     // Generate messages for each business
     const messagesToInsert = [];
     
+    // Safety logging
+    console.log('[messages/queue] SAFETY LOG:', {
+      requestedRecipientCount: recipient_count || businesses.length,
+      providedBusinesses: businesses.length,
+      internalTestPhone: includeInternalTest ? 'CONFIGURED' : 'NOT CONFIGURED',
+      includeInternalTest
+    });
+    
     for (const business of businesses) {
+      // Skip if this phone is already queued (duplicate prevention)
+      if (queuedPhones.has(business.selectedPhone)) {
+        console.log(`[messages/queue] Duplicate prevention: skipping ${business.selectedPhone}`);
+        continue;
+      }
+      
+      // Mark phone as queued
+      queuedPhones.add(business.selectedPhone);
+      
+      // Determine recipient source and traceability
+      const isInternalTest = business.selectedPhoneField === 'internal_test' || 
+                            (includeInternalTest && business.selectedPhone === internalTestPhone);
+      const isManualTest = business.selectedPhoneField === 'manual_test';
+      
+      const recipientSource = isInternalTest ? 'internal_test' : 
+                             isManualTest ? 'manual_test' : 'filtered_audience';
+      
       // Select template based on strategy
       const template = selectTemplate(templates, campaign.template_strategy, campaign_id);
       if (!template) continue;
       
       // Render message
       const context = {
-        business_name: business.name,
+        business_name: business.business_name || business.name,
         city: business.city,
         category: business.category,
         governorate: business.governorate,
@@ -82,16 +120,73 @@ router.post('/queue', async (req, res) => {
         campaign_id,
         template_id: template.id,
         business_id: business.id,
-        business_name: business.name,
+        business_name: business.business_name || business.name,
         category: business.category,
         city: business.city,
-        phone: business.phone, // Use the pre-selected phone
+        phone: business.selectedPhone,
         rendered_message: renderedMessage,
         status: 'pending',
+        // Traceability fields
+        is_internal_test: isInternalTest,
+        recipient_source: recipientSource,
+        message_mode: test_message_type || 'informative',
+        landing_page_variant: landing_page_variant || 'app_intro',
+        metadata: {
+          original_phone_field: business.selectedPhoneField,
+          template_strategy: campaign.template_strategy,
+          recipient_count_limit: recipient_count,
+          landing_variant: landing_page_variant
+        }
       });
     }
     
-    console.log(`[messages/queue] Generated ${messagesToInsert.length} messages for queuing`);
+    // Add internal test phone if not already included
+    if (includeInternalTest && !queuedPhones.has(internalTestPhone)) {
+      console.log(`[messages/queue] Adding internal test phone: ${internalTestPhone}`);
+      
+      const template = selectTemplate(templates, campaign.template_strategy, campaign_id);
+      if (template) {
+        const renderedMessage = renderTemplate(template, {
+          business_name: 'اختبار داخلي',
+          city: 'اختبار',
+          category: 'اختبار',
+          governorate: 'اختبار',
+        });
+        
+        messagesToInsert.push({
+          campaign_id,
+          template_id: template.id,
+          business_id: 'internal-test',
+          business_name: 'اختبار داخلي (Internal Test)',
+          category: 'اختبار',
+          city: 'اختبار',
+          phone: internalTestPhone,
+          rendered_message: renderedMessage,
+          status: 'pending',
+          is_internal_test: true,
+          recipient_source: 'internal_test',
+          message_mode: test_message_type || 'informative',
+          landing_page_variant: landing_page_variant || 'app_intro',
+          metadata: {
+            original_phone_field: 'internal_test_config',
+            template_strategy: campaign.template_strategy,
+            recipient_count_limit: recipient_count,
+            auto_added: true,
+            landing_variant: landing_page_variant
+          }
+        });
+      }
+    }
+    
+    // Final safety logging
+    console.log('[messages/queue] SAFETY LOG - FINAL:', {
+      totalMessagesToInsert: messagesToInsert.length,
+      internalTestMessages: messagesToInsert.filter(m => m.is_internal_test).length,
+      filteredAudienceMessages: messagesToInsert.filter(m => m.recipient_source === 'filtered_audience').length,
+      manualTestMessages: messagesToInsert.filter(m => m.recipient_source === 'manual_test').length,
+      uniquePhones: queuedPhones.size,
+      internalTestPhoneIncluded: includeInternalTest
+    });
     
     // Insert messages
     const { data: messages, error: insertError } = await supabase
@@ -109,7 +204,13 @@ router.post('/queue', async (req, res) => {
     
     res.json({ 
       queued: messages?.length || 0,
-      messages 
+      messages,
+      safety_summary: {
+        total_queued: messages?.length || 0,
+        internal_test_count: messagesToInsert.filter(m => m.is_internal_test).length,
+        filtered_audience_count: messagesToInsert.filter(m => m.recipient_source === 'filtered_audience').length,
+        manual_test_count: messagesToInsert.filter(m => m.recipient_source === 'manual_test').length
+      }
     });
     
   } catch (error: any) {
