@@ -1,5 +1,8 @@
+-- Enable required extension for UUID generation
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
 -- Campaigns table
-CREATE TABLE campaigns (
+CREATE TABLE IF NOT EXISTS campaigns (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(255) NOT NULL,
   description TEXT,
@@ -12,7 +15,7 @@ CREATE TABLE campaigns (
 );
 
 -- Message templates table
-CREATE TABLE message_templates (
+CREATE TABLE IF NOT EXISTS message_templates (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(255) NOT NULL,
   body TEXT NOT NULL,
@@ -25,8 +28,22 @@ CREATE TABLE message_templates (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- FAQ answers table (must exist before conversation_messages references it)
+CREATE TABLE IF NOT EXISTS faq_answers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  question_keywords TEXT[] NOT NULL, -- array of keywords to match
+  answer TEXT NOT NULL,
+  is_active BOOLEAN DEFAULT true,
+  auto_send BOOLEAN DEFAULT false, -- whether to auto-send or just suggest
+  confidence_threshold DECIMAL(3,2) DEFAULT 0.7,
+  usage_count INTEGER DEFAULT 0,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Campaign templates junction table
-CREATE TABLE campaign_templates (
+CREATE TABLE IF NOT EXISTS campaign_templates (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   campaign_id UUID REFERENCES campaigns(id) ON DELETE CASCADE,
   template_id UUID REFERENCES message_templates(id) ON DELETE CASCADE,
@@ -35,7 +52,7 @@ CREATE TABLE campaign_templates (
 );
 
 -- Messages queue table
-CREATE TABLE messages (
+CREATE TABLE IF NOT EXISTS messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   campaign_id UUID REFERENCES campaigns(id) ON DELETE CASCADE,
   template_id UUID REFERENCES message_templates(id),
@@ -56,8 +73,8 @@ CREATE TABLE messages (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Conversation messages (inbox)
-CREATE TABLE conversation_messages (
+-- Conversation messages (inbox) - created after faq_answers exists
+CREATE TABLE IF NOT EXISTS conversation_messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   phone VARCHAR(50) NOT NULL,
   business_id UUID,
@@ -76,22 +93,8 @@ CREATE TABLE conversation_messages (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- FAQ answers table
-CREATE TABLE faq_answers (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  question_keywords TEXT[] NOT NULL, -- array of keywords to match
-  answer TEXT NOT NULL,
-  is_active BOOLEAN DEFAULT true,
-  auto_send BOOLEAN DEFAULT false, -- whether to auto-send or just suggest
-  confidence_threshold DECIMAL(3,2) DEFAULT 0.7,
-  usage_count INTEGER DEFAULT 0,
-  metadata JSONB DEFAULT '{}',
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
 -- Template performance stats (for A/B testing)
-CREATE TABLE template_stats (
+CREATE TABLE IF NOT EXISTS template_stats (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   template_id UUID REFERENCES message_templates(id) ON DELETE CASCADE,
   campaign_id UUID REFERENCES campaigns(id) ON DELETE CASCADE,
@@ -105,14 +108,14 @@ CREATE TABLE template_stats (
 );
 
 -- Indexes for performance
-CREATE INDEX idx_messages_campaign_id ON messages(campaign_id);
-CREATE INDEX idx_messages_status ON messages(status);
-CREATE INDEX idx_messages_phone ON messages(phone);
-CREATE INDEX idx_messages_created_at ON messages(created_at);
-CREATE INDEX idx_conversation_phone ON conversation_messages(phone);
-CREATE INDEX idx_conversation_created_at ON conversation_messages(created_at);
-CREATE INDEX idx_conversation_direction ON conversation_messages(direction);
-CREATE INDEX idx_campaign_templates_campaign_id ON campaign_templates(campaign_id);
+CREATE INDEX IF NOT EXISTS idx_messages_campaign_id ON messages(campaign_id);
+CREATE INDEX IF NOT EXISTS idx_messages_status ON messages(status);
+CREATE INDEX IF NOT EXISTS idx_messages_phone ON messages(phone);
+CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);
+CREATE INDEX IF NOT EXISTS idx_conversation_phone ON conversation_messages(phone);
+CREATE INDEX IF NOT EXISTS idx_conversation_created_at ON conversation_messages(created_at);
+CREATE INDEX IF NOT EXISTS idx_conversation_direction ON conversation_messages(direction);
+CREATE INDEX IF NOT EXISTS idx_campaign_templates_campaign_id ON campaign_templates(campaign_id);
 
 -- Enable RLS (Row Level Security) - adjust policies as needed
 ALTER TABLE campaigns ENABLE ROW LEVEL SECURITY;
@@ -120,6 +123,8 @@ ALTER TABLE message_templates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE conversation_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE faq_answers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE campaign_templates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE template_stats ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for service role (backend access)
 DROP POLICY IF EXISTS "service_role_full_access_campaigns" ON campaigns;
@@ -128,6 +133,10 @@ CREATE POLICY "service_role_full_access_campaigns" ON campaigns
 
 DROP POLICY IF EXISTS "service_role_full_access_message_templates" ON message_templates;
 CREATE POLICY "service_role_full_access_message_templates" ON message_templates
+  FOR ALL USING (auth.jwt() ->> 'role' = 'service_role');
+
+DROP POLICY IF EXISTS "service_role_full_access_campaign_templates" ON campaign_templates;
+CREATE POLICY "service_role_full_access_campaign_templates" ON campaign_templates
   FOR ALL USING (auth.jwt() ->> 'role' = 'service_role');
 
 DROP POLICY IF EXISTS "service_role_full_access_messages" ON messages;
@@ -140,10 +149,6 @@ CREATE POLICY "service_role_full_access_conversation_messages" ON conversation_m
 
 DROP POLICY IF EXISTS "service_role_full_access_faq_answers" ON faq_answers;
 CREATE POLICY "service_role_full_access_faq_answers" ON faq_answers
-  FOR ALL USING (auth.jwt() ->> 'role' = 'service_role');
-
-DROP POLICY IF EXISTS "service_role_full_access_campaign_templates" ON campaign_templates;
-CREATE POLICY "service_role_full_access_campaign_templates" ON campaign_templates
   FOR ALL USING (auth.jwt() ->> 'role' = 'service_role');
 
 DROP POLICY IF EXISTS "service_role_full_access_template_stats" ON template_stats;
@@ -159,23 +164,28 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Add updated_at triggers
+-- Add updated_at triggers (safe with IF NOT EXISTS approach)
+DROP TRIGGER IF EXISTS update_campaigns_updated_at ON campaigns;
 CREATE TRIGGER update_campaigns_updated_at
   BEFORE UPDATE ON campaigns
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_message_templates_updated_at ON message_templates;
 CREATE TRIGGER update_message_templates_updated_at
   BEFORE UPDATE ON message_templates
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_messages_updated_at ON messages;
 CREATE TRIGGER update_messages_updated_at
   BEFORE UPDATE ON messages
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_faq_answers_updated_at ON faq_answers;
 CREATE TRIGGER update_faq_answers_updated_at
   BEFORE UPDATE ON faq_answers
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_template_stats_updated_at ON template_stats;
 CREATE TRIGGER update_template_stats_updated_at
   BEFORE UPDATE ON template_stats
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
