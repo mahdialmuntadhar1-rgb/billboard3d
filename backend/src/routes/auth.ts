@@ -165,4 +165,4 @@ auth.get('/me', async (c) => {
   }
 });
 
-export { auth };
+export { auth as authRoutes };

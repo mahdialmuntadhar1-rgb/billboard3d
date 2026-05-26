@@ -14,7 +14,7 @@ database_id = "your-database-id"
 [env.production.vars]
 JWT_SECRET = "your-production-jwt-secret"
 
-[env.production.d1_databases]]
+[[env.production.d1_databases]]
 binding = "DB"
 database_name = "billboard3d-db-prod"
 database_id = "your-production-database-id"
@@ -22,7 +22,7 @@ database_id = "your-production-database-id"
 [env.staging.vars]
 JWT_SECRET = "your-staging-jwt-secret"
 
-[env.staging.d1_databases]]
+[[env.staging.d1_databases]]
 binding = "DB"
 database_name = "billboard3d-db-staging"
 database_id = "your-staging-database-id"

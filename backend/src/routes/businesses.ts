@@ -193,4 +193,4 @@ businesses.delete('/:id', authMiddleware, async (c) => {
   }
 });
 
-export { businesses };
+export { businesses as businessRoutes };
