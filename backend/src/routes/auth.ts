@@ -3,13 +3,15 @@ import { successResponse, errorResponse } from '../utils/response';
 import { JWTUtils } from '../utils/jwt';
 import { DatabaseClient } from '../db/client';
 import type { Bindings, Variables } from '../types';
+import type { RegisterRequestDTO, LoginRequestDTO, AuthResponseDTO, MeResponseDTO } from '../dtos/auth.dto';
 
 const auth = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 // POST /auth/register
 auth.post('/register', async (c) => {
   try {
-    const { email, password, name } = await c.req.json();
+    const body: RegisterRequestDTO = await c.req.json();
+    const { email, password, name } = body;
 
     // Validate input
     if (!email || !password || !name) {
@@ -58,20 +60,26 @@ auth.post('/register', async (c) => {
     // Generate JWT
     JWTUtils.setSecret(c.env.JWT_SECRET);
     const token = await JWTUtils.sign({
-      sub: user.id,
-      email: user.email,
-      role: user.role
+      sub: user.id as string,
+      email: user.email as string,
+      role: user.role as string
     });
 
-    return successResponse(c, {
-      user: {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        createdAt: user.created_at
-      },
-      token
-    });
+    // Return DTO-compliant response
+    const response: AuthResponseDTO = {
+      success: true,
+      data: {
+        user: {
+          id: user.id as string,
+          name: name,
+          email: user.email as string,
+          role: user.role as string
+        },
+        token
+      }
+    };
+
+    return c.json(response, 201);
   } catch (error) {
     return errorResponse(c, 'INTERNAL_ERROR', 'Registration failed');
   }
@@ -80,7 +88,8 @@ auth.post('/register', async (c) => {
 // POST /auth/login
 auth.post('/login', async (c) => {
   try {
-    const { email, password } = await c.req.json();
+    const body: LoginRequestDTO = await c.req.json();
+    const { email, password } = body;
 
     // Validate input
     if (!email || !password) {
@@ -110,20 +119,26 @@ auth.post('/login', async (c) => {
     // Generate JWT
     JWTUtils.setSecret(c.env.JWT_SECRET);
     const token = await JWTUtils.sign({
-      sub: user.id,
-      email: user.email,
-      role: user.role
+      sub: user.id as string,
+      email: user.email as string,
+      role: user.role as string
     });
 
-    return successResponse(c, {
-      user: {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        createdAt: user.created_at
-      },
-      token
-    });
+    // Return DTO-compliant response
+    const response: AuthResponseDTO = {
+      success: true,
+      data: {
+        user: {
+          id: user.id as string,
+          name: (user.name as string) || '',
+          email: user.email as string,
+          role: user.role as string
+        },
+        token
+      }
+    };
+
+    return c.json(response);
   } catch (error) {
     return errorResponse(c, 'INTERNAL_ERROR', 'Login failed');
   }
@@ -133,7 +148,7 @@ auth.post('/login', async (c) => {
 auth.get('/me', async (c) => {
   try {
     const authHeader = c.req.header('Authorization');
-    const token = JWTUtils.extractFromHeader(authHeader);
+    const token = JWTUtils.extractFromHeader(authHeader || '');
 
     if (!token) {
       return errorResponse(c, 'UNAUTHORIZED', 'Authorization token required', 401);
@@ -153,13 +168,20 @@ auth.get('/me', async (c) => {
       return errorResponse(c, 'USER_NOT_FOUND', 'User not found', 404);
     }
 
-    return successResponse(c, {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      createdAt: user.created_at,
-      updatedAt: user.updated_at
-    });
+    // Return DTO-compliant response
+    const response: MeResponseDTO = {
+      success: true,
+      data: {
+        id: user.id as string,
+        email: user.email as string,
+        name: user.name as string | undefined,
+        role: user.role as string,
+        createdAt: user.created_at as string,
+        updatedAt: user.updated_at as string
+      }
+    };
+
+    return c.json(response);
   } catch (error) {
     return errorResponse(c, 'INTERNAL_ERROR', 'Failed to get user profile');
   }

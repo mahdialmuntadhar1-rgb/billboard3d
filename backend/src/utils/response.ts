@@ -1,31 +1,35 @@
 import type { Context } from 'hono';
-import type { ApiResponse, PaginationMeta } from '../types';
+import type { SuccessResponse } from '../dtos/common.dto';
+import type { ErrorResponseDTO, ErrorDTO } from '../dtos/error.dto';
+import type { PaginationMetaDTO } from '../dtos/pagination.dto';
 
 export const successResponse = <T>(
   c: Context,
   data: T,
-  meta?: PaginationMeta,
+  meta?: PaginationMetaDTO,
   status = 200
 ) => {
-  const response: ApiResponse<T> = {
+  const response: SuccessResponse<T> = {
     success: true,
     data,
     ...(meta && { meta })
   };
   
-  return c.json(response, status);
+  return c.json(response, status as any);
 };
 
 export const errorResponse = (
   c: Context,
   code: string,
   message: string,
-  status = 400
+  status = 400,
+  details?: Record<string, any>
 ) => {
-  const response: ApiResponse = {
+  const error: ErrorDTO = { code, message, ...(details && { details }) };
+  const response: ErrorResponseDTO = {
     success: false,
-    error: { code, message }
+    error
   };
   
-  return c.json(response, status);
+  return c.json(response, status as any);
 };

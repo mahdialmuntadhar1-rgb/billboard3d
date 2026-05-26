@@ -4,13 +4,14 @@ import { JWTUtils } from '../utils/jwt';
 import { DatabaseClient } from '../db/client';
 import { PaginationUtils } from '../utils/pagination';
 import type { Bindings, Variables } from '../types';
+import type { BusinessDTO, BusinessListResponseDTO, BusinessDetailResponseDTO, CreateBusinessDTO, UpdateBusinessDTO } from '../dtos/business.dto';
 
 const businesses = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 // Authentication middleware for protected routes
 const authMiddleware = async (c: any, next: any) => {
   const authHeader = c.req.header('Authorization');
-  const token = JWTUtils.extractFromHeader(authHeader);
+  const token = JWTUtils.extractFromHeader(authHeader || '');
 
   if (!token) {
     return errorResponse(c, 'UNAUTHORIZED', 'Authorization token required', 401);
@@ -37,7 +38,7 @@ businesses.get('/', async (c) => {
     const db = new DatabaseClient(c.env.DB);
     
     // Get businesses
-    const businesses = await db.getBusinesses({
+    const businessResults = await db.getBusinesses({
       limit: pagination.limit,
       offset: pagination.offset,
       category: query.category,
@@ -46,15 +47,48 @@ businesses.get('/', async (c) => {
     });
 
     // Get total count
-    const total = await db.getBusinessesCount({
+    const countResult = await db.getBusinessesCount({
       category: query.category,
       city: query.city,
       search: query.search
     });
+    const total = typeof countResult === 'number' ? countResult : (countResult as any)?.count || 0;
 
     const meta = PaginationUtils.buildMeta(total, pagination);
 
-    return successResponse(c, businesses, meta);
+    // Transform to DTO format
+    const businessDTOs: BusinessDTO[] = businessResults.map((biz: any) => ({
+      id: biz.id as string,
+      name: biz.name as string,
+      description: biz.description as string,
+      category: biz.category as string,
+      city: biz.city as string,
+      country: biz.country as string,
+      website: biz.website as string | undefined,
+      email: biz.email as string | undefined,
+      phone: biz.phone as string | undefined,
+      address: biz.address as string | undefined,
+      rating: biz.rating as number,
+      reviewCount: biz.review_count as number,
+      isActive: biz.is_active === 1,
+      createdAt: biz.created_at as string,
+      updatedAt: biz.updated_at as string
+    }));
+
+    // Return DTO-compliant response
+    const response: BusinessListResponseDTO = {
+      success: true,
+      data: businessDTOs,
+      meta: {
+        total,
+        page: pagination.page,
+        limit: pagination.limit,
+        hasNext: meta.hasNext,
+        hasPrev: meta.hasPrev
+      }
+    };
+
+    return c.json(response);
   } catch (error) {
     return errorResponse(c, 'INTERNAL_ERROR', 'Failed to fetch businesses');
   }
@@ -76,7 +110,32 @@ businesses.get('/:id', async (c) => {
       return errorResponse(c, 'NOT_FOUND', 'Business not found', 404);
     }
 
-    return successResponse(c, business);
+    // Transform to DTO format
+    const businessDTO: BusinessDTO = {
+      id: business.id as string,
+      name: business.name as string,
+      description: business.description as string,
+      category: business.category as string,
+      city: business.city as string,
+      country: business.country as string,
+      website: business.website as string | undefined,
+      email: business.email as string | undefined,
+      phone: business.phone as string | undefined,
+      address: business.address as string | undefined,
+      rating: business.rating as number,
+      reviewCount: business.review_count as number,
+      isActive: business.is_active === 1,
+      createdAt: business.created_at as string,
+      updatedAt: business.updated_at as string
+    };
+
+    // Return DTO-compliant response
+    const response: BusinessDetailResponseDTO = {
+      success: true,
+      data: businessDTO
+    };
+
+    return c.json(response);
   } catch (error) {
     return errorResponse(c, 'INTERNAL_ERROR', 'Failed to fetch business');
   }
@@ -90,7 +149,7 @@ businesses.post('/', authMiddleware, async (c) => {
       return errorResponse(c, 'FORBIDDEN', 'Admin access required', 403);
     }
 
-    const data = await c.req.json();
+    const data: CreateBusinessDTO = await c.req.json();
 
     // Validate required fields
     if (!data.name || !data.description || !data.category || !data.city || !data.country) {
@@ -110,7 +169,32 @@ businesses.post('/', authMiddleware, async (c) => {
       return errorResponse(c, 'CREATION_FAILED', 'Failed to retrieve created business');
     }
 
-    return successResponse(c, business, undefined, 201);
+    // Transform to DTO format
+    const businessDTO: BusinessDTO = {
+      id: business.id as string,
+      name: business.name as string,
+      description: business.description as string,
+      category: business.category as string,
+      city: business.city as string,
+      country: business.country as string,
+      website: business.website as string | undefined,
+      email: business.email as string | undefined,
+      phone: business.phone as string | undefined,
+      address: business.address as string | undefined,
+      rating: business.rating as number,
+      reviewCount: business.review_count as number,
+      isActive: business.is_active === 1,
+      createdAt: business.created_at as string,
+      updatedAt: business.updated_at as string
+    };
+
+    // Return DTO-compliant response
+    const response: BusinessDetailResponseDTO = {
+      success: true,
+      data: businessDTO
+    };
+
+    return c.json(response, 201);
   } catch (error) {
     return errorResponse(c, 'INTERNAL_ERROR', 'Failed to create business');
   }
@@ -125,7 +209,7 @@ businesses.put('/:id', authMiddleware, async (c) => {
     }
 
     const id = c.req.param('id');
-    const data = await c.req.json();
+    const data: UpdateBusinessDTO = await c.req.json();
 
     if (!id) {
       return errorResponse(c, 'VALIDATION_ERROR', 'Business ID is required');
@@ -151,7 +235,32 @@ businesses.put('/:id', authMiddleware, async (c) => {
       return errorResponse(c, 'UPDATE_FAILED', 'Failed to retrieve updated business');
     }
 
-    return successResponse(c, updatedBusiness);
+    // Transform to DTO format
+    const businessDTO: BusinessDTO = {
+      id: updatedBusiness.id as string,
+      name: updatedBusiness.name as string,
+      description: updatedBusiness.description as string,
+      category: updatedBusiness.category as string,
+      city: updatedBusiness.city as string,
+      country: updatedBusiness.country as string,
+      website: updatedBusiness.website as string | undefined,
+      email: updatedBusiness.email as string | undefined,
+      phone: updatedBusiness.phone as string | undefined,
+      address: updatedBusiness.address as string | undefined,
+      rating: updatedBusiness.rating as number,
+      reviewCount: updatedBusiness.review_count as number,
+      isActive: updatedBusiness.is_active === 1,
+      createdAt: updatedBusiness.created_at as string,
+      updatedAt: updatedBusiness.updated_at as string
+    };
+
+    // Return DTO-compliant response
+    const response: BusinessDetailResponseDTO = {
+      success: true,
+      data: businessDTO
+    };
+
+    return c.json(response);
   } catch (error) {
     return errorResponse(c, 'INTERNAL_ERROR', 'Failed to update business');
   }

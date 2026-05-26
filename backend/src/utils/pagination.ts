@@ -1,9 +1,4 @@
-import type { PaginationMeta } from '../types';
-
-export interface PaginationOptions {
-  page?: number;
-  limit?: number;
-}
+import type { PaginationMetaDTO } from '../dtos/pagination.dto';
 
 export interface PaginationParams {
   page: number;
@@ -23,7 +18,7 @@ export class PaginationUtils {
     return { page, limit, offset };
   }
 
-  static buildMeta(total: number, params: PaginationParams): PaginationMeta {
+  static buildMeta(total: number, params: PaginationParams): PaginationMetaDTO {
     const totalPages = Math.ceil(total / params.limit);
     const hasNext = params.page < totalPages;
     const hasPrev = params.page > 1;
