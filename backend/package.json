@@ -1,0 +1,32 @@
+{
+  "name": "billboard3d-api",
+  "version": "1.0.0",
+  "description": "Cloudflare Workers API for Billboard3D",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail",
+    "build": "tsc",
+    "cf-typegen": "wrangler types"
+  },
+  "dependencies": {
+    "hono": "^4.0.0",
+    "@hono/zod-validator": "^0.2.0",
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240512.0",
+    "wrangler": "^3.60.0",
+    "typescript": "^5.4.0"
+  },
+  "keywords": [
+    "cloudflare",
+    "workers",
+    "api",
+    "billboard3d"
+  ],
+  "author": "",
+  "license": "MIT"
+}

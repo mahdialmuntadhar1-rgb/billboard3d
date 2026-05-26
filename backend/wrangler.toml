@@ -1,0 +1,28 @@
+name = "billboard3d-api"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+JWT_SECRET = "your-super-secret-jwt-key-change-in-production"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "billboard3d-db"
+database_id = "your-database-id"
+
+[env.production.vars]
+JWT_SECRET = "your-production-jwt-secret"
+
+[env.production.d1_databases]]
+binding = "DB"
+database_name = "billboard3d-db-prod"
+database_id = "your-production-database-id"
+
+[env.staging.vars]
+JWT_SECRET = "your-staging-jwt-secret"
+
+[env.staging.d1_databases]]
+binding = "DB"
+database_name = "billboard3d-db-staging"
+database_id = "your-staging-database-id"
